@@ -105,11 +105,12 @@ slug: `beginRun`, `saveRun`, `updateRun`, `finishRun`, `abandonRun`, `clearRun`,
 plus `setSettings` and `setProgress`.
 
 ```tsx
+import { useState } from "react";
 import { useCabinetRuntime } from "@jbcom/game-session/react";
 import { CabinetPauseMenu } from "@jbcom/game-session/ui";
 import { isCabinetRuntimePaused, setCabinetRuntimePaused } from "@jbcom/game-session";
 
-function Game() {
+function Game({ onReturnToCabinet }: { onReturnToCabinet: () => void }) {
   const { settings, saveSlot, setSettings, abandonRun } = useCabinetRuntime("my-game");
   const [paused, setPaused] = useState(false);
 
@@ -122,11 +123,12 @@ function Game() {
         rules={["Collect the orbs.", "Do not touch the walls."]}
         saveSlot={saveSlot}
         settings={settings}
+        onCabinet={onReturnToCabinet}
         onClose={() => {
           setCabinetRuntimePaused(false);
           setPaused(false);
         }}
-        onRestart={() => restart()}
+        onRestart={() => restartRun()}
         onQuitRun={() => abandonRun()}
         onSettingsChange={setSettings}
       />
