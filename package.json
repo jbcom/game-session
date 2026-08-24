@@ -60,5 +60,9 @@
     "react-dom": "^19.2.5",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://redacted-private-registry.example/arcade-cabinet/session-runtime"
   }
 }
