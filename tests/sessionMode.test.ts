@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
   DEFAULT_SESSION_TUNING,
+  getSessionPressureScale,
+  getSessionRecoveryScale,
   getSessionTuning,
   normalizeSessionMode,
   SESSION_MODES,
@@ -41,5 +43,25 @@ describe("session mode tuning", () => {
 
     expect(getSessionTuning("cozy", overrides).targetMinutes).toEqual([20, 30]);
     expect(getSessionTuning("cozy")).toEqual(DEFAULT_SESSION_TUNING.cozy);
+  });
+
+  test("getSessionPressureScale reads the default table and accepts an override table", () => {
+    expect(getSessionPressureScale("challenge")).toBe(
+      DEFAULT_SESSION_TUNING.challenge.pressureScale
+    );
+    expect(getSessionPressureScale("cozy")).toBe(DEFAULT_SESSION_TUNING.cozy.pressureScale);
+    expect(getSessionPressureScale(undefined)).toBe(DEFAULT_SESSION_TUNING.standard.pressureScale);
+
+    expect(getSessionPressureScale("challenge", { challenge: 9, cozy: 1, standard: 1 })).toBe(9);
+  });
+
+  test("getSessionRecoveryScale reads the default table and accepts an override table", () => {
+    expect(getSessionRecoveryScale("challenge")).toBe(
+      DEFAULT_SESSION_TUNING.challenge.recoveryScale
+    );
+    expect(getSessionRecoveryScale("cozy")).toBe(DEFAULT_SESSION_TUNING.cozy.recoveryScale);
+    expect(getSessionRecoveryScale(undefined)).toBe(DEFAULT_SESSION_TUNING.standard.recoveryScale);
+
+    expect(getSessionRecoveryScale("cozy", { challenge: 1, cozy: 8, standard: 1 })).toBe(8);
   });
 });

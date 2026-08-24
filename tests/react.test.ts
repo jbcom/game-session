@@ -59,6 +59,17 @@ describe("session-runtime browser storage", () => {
     expect(readGameSaveSlot("otterly-chaotic")).toBeUndefined();
   });
 
+  test("uses a caller-supplied label instead of the mode-derived default", () => {
+    beginGameRun("otterly-chaotic", "challenge", {
+      label: "Continue Rescue",
+      progressSummary: "Round 2 rescue",
+    });
+
+    expect(readGameSaveSlot("otterly-chaotic")).toMatchObject({
+      label: "Continue Rescue",
+    });
+  });
+
   test("finishes a run, records progress, and clears stale resume state", () => {
     beginGameRun("mega-track", "standard", {
       progressSummary: "Leg 2",
