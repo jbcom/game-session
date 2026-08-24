@@ -18,7 +18,19 @@ if (existsSync(distDir)) {
 }
 
 // 1. ESM + type declarations via tsc (respects tsconfig.json in this package).
-execFileSync("pnpm", ["exec", "tsc", "-p", path.join(root, "tsconfig.json")], {
+// Resolved directly from node_modules/.bin rather than shelled out through
+// `pnpm exec` -- this script already runs inside a pnpm-invoked process, and
+// re-invoking the `pnpm` binary from there hits corepack's "wrong pnpm
+// version on PATH, and corepack won't re-switch from inside itself" failure
+// mode in some environments. The devDependency's own binary needs no package
+// manager in the loop at all.
+const tscBin = path.join(
+  root,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "tsc.cmd" : "tsc"
+);
+execFileSync(tscBin, ["-p", path.join(root, "tsconfig.json")], {
   cwd: root,
   stdio: "inherit",
 });
