@@ -107,5 +107,14 @@
     "node": ">=22",
     "pnpm": ">=11"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "author": "Jon Bogaty <jon@jonbogaty.com>",
+  "keywords": [
+    "game-session",
+    "pause-menu",
+    "local-storage",
+    "game-dev",
+    "browser-games",
+    "react"
+  ]
 }
