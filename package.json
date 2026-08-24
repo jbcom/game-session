@@ -64,6 +64,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "peerDependencies": {
@@ -87,6 +88,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.24.0",
     "jsdom": "^29.0.2",
     "lucide-react": "^0.479.0",
