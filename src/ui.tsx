@@ -25,11 +25,20 @@ import { useCabinetRuntime } from "./react.js";
 import type { GameRunStatus, GameSaveSlot, GameSettings } from "./runtime.js";
 import type { SessionMode } from "./sessionMode.js";
 
-interface CabinetMenuButtonProps {
+/** Props for {@link CabinetMenuButton}. */
+export interface CabinetMenuButtonProps {
+  /** Called when the button is clicked -- typically opens {@link CabinetPauseMenu}. */
   onClick: () => void;
+  /** Accessible label and tooltip text. Defaults to `"Open cabinet menu"`. */
   title?: string;
 }
 
+/**
+ * A fixed-position, top-left pause/menu button. Carries
+ * `data-joystick-ignore="true"` so an on-screen virtual joystick never
+ * captures pointer events meant for this button -- render it alongside your
+ * game canvas and wire `onClick` to open {@link CabinetPauseMenu}.
+ */
 export function CabinetMenuButton({
   onClick,
   title = "Open cabinet menu",
@@ -49,18 +58,38 @@ export function CabinetMenuButton({
   );
 }
 
+/** Props for {@link RuntimeResultRecorder}. */
 export interface RuntimeResultRecorderProps {
+  /** The game the result belongs to. */
   slug: string;
+  /** The session mode the run was played in. */
   mode: SessionMode;
+  /** How the run ended. Never `"active"`. */
   status: Exclude<GameRunStatus, "active">;
+  /** The run's score. */
   score: number;
+  /** Player-facing summary. Defaults to a status-based phrase when omitted. */
   summary?: string;
+  /** Optional free-form per-run stats. */
   stats?: Record<string, number | string | boolean>;
+  /** Milestone identifiers earned by this run. */
   milestones?: readonly string[];
   /** localStorage key namespace forwarded to useCabinetRuntime. */
   namespace?: string;
 }
 
+/**
+ * Records a {@link GameResult} on mount (and again whenever the props
+ * describing the result change) by calling `finishRun` internally, then
+ * renders nothing. Drop this into a "game over" screen instead of calling
+ * `useCabinetRuntime().finishRun` yourself when you'd rather express the
+ * result as declarative props.
+ *
+ * Dedupes by a hash of all its props: re-rendering with the exact same
+ * `slug`/`mode`/`status`/`score`/`summary`/`stats`/`milestones` will not
+ * record the result twice, so this is safe to mount on a screen that itself
+ * re-renders for unrelated reasons.
+ */
 export function RuntimeResultRecorder({
   milestones = [],
   mode,
@@ -94,19 +123,38 @@ export function RuntimeResultRecorder({
   return null;
 }
 
-interface CabinetPauseMenuProps {
+/** Props for {@link CabinetPauseMenu}. */
+export interface CabinetPauseMenuProps {
+  /** Displayed in the header when the main menu view is showing. */
   gameTitle: string;
+  /** Whether the menu is open. Renders nothing (`null`) when `false`. */
   open: boolean;
+  /** Numbered rules shown in the "Rules" sub-view. The "Rules" action is disabled when empty. */
   rules?: readonly string[];
+  /** The active run's save slot, if any -- shown as an "Active run: ..." banner on the main view. */
   saveSlot?: GameSaveSlot;
+  /** Current settings, passed through to the "Settings" sub-view. */
   settings: GameSettings;
+  /** Called when the "Cabinet" action is clicked (return to the game-select shell). */
   onCabinet: () => void;
+  /** Called when the "Resume" action or the header close button is clicked. */
   onClose: () => void;
+  /** Called when the "Quit Run" action is clicked (abandon the current run). */
   onQuitRun: () => void;
+  /** Called when the "Restart" action is clicked. */
   onRestart: () => void;
+  /** Called with the updated settings whenever the "Settings" sub-view changes a value. */
   onSettingsChange: (next: GameSettings | ((current: GameSettings) => GameSettings)) => void;
 }
 
+/**
+ * A full-screen pause menu with three views: the main menu (Resume, Restart,
+ * Settings, Rules, Cabinet, Quit Run), an embedded {@link CabinetSettingsPanel},
+ * and a rules list. Purely presentational -- it owns no persistence or
+ * routing; wire its `on*` callbacks to {@link useCabinetRuntime}'s
+ * `abandonRun`/`setSettings`/etc and your own restart/navigation logic.
+ * Always resets to the main menu view when reopened.
+ */
 export function CabinetPauseMenu({
   gameTitle,
   open,
@@ -230,12 +278,23 @@ function CabinetRulesPanel({ onBack, rules }: CabinetRulesPanelProps) {
   );
 }
 
-interface CabinetSettingsPanelProps {
+/** Props for {@link CabinetSettingsPanel}. */
+export interface CabinetSettingsPanelProps {
+  /** Current settings to render controls for. */
   settings: GameSettings;
+  /** Called when the "Back" button is clicked. */
   onBack: () => void;
+  /** Called with the updated settings whenever any control changes a value. */
   onSettingsChange: (next: GameSettings | ((current: GameSettings) => GameSettings)) => void;
 }
 
+/**
+ * Standalone settings form: toggles for sound/haptics/reduced-motion,
+ * segmented controls for graphics quality and handedness, and range sliders
+ * for joystick sensitivity and text scale. {@link CabinetPauseMenu} embeds
+ * this as its "Settings" sub-view, but it renders and functions the same on
+ * its own -- mount it directly for a standalone settings screen.
+ */
 export function CabinetSettingsPanel({
   settings,
   onBack,
@@ -316,8 +375,16 @@ export function CabinetSettingsPanel({
   );
 }
 
-interface CabinetErrorBoundaryProps extends PropsWithChildren {
+/** Props for {@link CabinetErrorBoundary}. */
+export interface CabinetErrorBoundaryProps extends PropsWithChildren {
+  /**
+   * Changing this value clears any caught error and gives `children` a fresh
+   * attempt to render -- e.g. set it to the current game's slug so
+   * navigating to a different game after a crash doesn't stay stuck on the
+   * fallback UI.
+   */
   boundaryKey?: string;
+  /** Called when the fallback UI's "Return To Cabinet" button is clicked. */
   onReturnToCabinet?: () => void;
 }
 
@@ -326,6 +393,17 @@ interface CabinetErrorBoundaryState {
   boundaryKey?: string;
 }
 
+/**
+ * A React error boundary that catches render errors from `children` (e.g. a
+ * WebGL boot failure) and shows a "Return To Cabinet" fallback instead of a
+ * blank crashed page, logging the error via `console.error`. Wrap a game's
+ * boot/render tree in this so one cartridge failing to start doesn't take
+ * down the whole cabinet shell.
+ *
+ * The caught error persists across re-renders until `boundaryKey` changes
+ * (see {@link CabinetErrorBoundaryProps.boundaryKey}) -- an error boundary
+ * cannot otherwise reset itself once tripped.
+ */
 export class CabinetErrorBoundary extends Component<
   CabinetErrorBoundaryProps,
   CabinetErrorBoundaryState
@@ -341,7 +419,10 @@ export class CabinetErrorBoundary extends Component<
     state: CabinetErrorBoundaryState
   ): CabinetErrorBoundaryState | null {
     if (state.boundaryKey !== props.boundaryKey) {
-      return { boundaryKey: props.boundaryKey };
+      // A changed boundaryKey is the caller asking for a fresh attempt (e.g.
+      // "Return to Cabinet" then relaunch) -- clear the caught error along
+      // with the key, or the fallback UI would be stuck forever.
+      return { boundaryKey: props.boundaryKey, error: undefined };
     }
 
     return null;
