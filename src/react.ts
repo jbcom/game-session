@@ -19,11 +19,11 @@ import {
 import { normalizeSessionMode, type SessionMode } from "./sessionMode.js";
 
 /**
- * localStorage key prefix. Defaults to the arcade-cabinet shell's original
+ * localStorage key prefix. Defaults to
  * namespace for drop-in compatibility; override per-app to avoid collisions
  * when multiple session-runtime consumers share one origin.
  */
-export const DEFAULT_STORAGE_NAMESPACE = "arcade-cabinet:v1";
+export const DEFAULT_STORAGE_NAMESPACE = "game-session:v1";
 
 export interface FinishGameRunInput {
   mode: SessionMode;
@@ -223,7 +223,7 @@ export function abandonGameRun(
 }
 
 export interface UseCabinetRuntimeOptions {
-  /** localStorage key namespace. Defaults to the shell's original "arcade-cabinet:v1". */
+  /** localStorage key namespace. Defaults to the shell's original "game-session:v1". */
   namespace?: string;
 }
 

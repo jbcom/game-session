@@ -50,7 +50,7 @@ export const DEFAULT_DIFFICULTY_VARIANTS: readonly DifficultyVariant[] = [
 
 /**
  * Default per-mode tuning. Consumers that need per-game tuning overrides
- * (the arcade-cabinet shell's LAUNCH_GAME_SESSION_TUNING registry) should
+ * (a host app's own tuning registry) should
  * build their own `Record<string, Record<SessionMode, SessionTuning>>` on
  * top of this — that registry is app-specific, not part of this package.
  */

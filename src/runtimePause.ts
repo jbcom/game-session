@@ -1,4 +1,4 @@
-const PAUSE_EVENT = "arcade-cabinet:pause-change";
+const PAUSE_EVENT = "game-session:pause-change";
 
 export interface CabinetPauseChangeDetail {
   paused: boolean;

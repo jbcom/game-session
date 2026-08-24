@@ -78,7 +78,7 @@ readGameProgress("my-game");
 `undefined` when there was no run in flight.
 
 Everything is namespaced under a storage prefix you control
-(`DEFAULT_STORAGE_NAMESPACE` is `"arcade-cabinet:v1"`); pass your own to keep
+(`DEFAULT_STORAGE_NAMESPACE` is `"game-session:v1"`); pass your own to keep
 two games on one origin from colliding. Reads normalize whatever they find, so
 a corrupted or older-shaped value degrades to defaults instead of throwing.
 

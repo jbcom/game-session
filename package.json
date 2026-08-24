@@ -2,7 +2,7 @@
   "name": "@jbcom/game-session",
   "version": "0.1.0",
   "packageManager": "pnpm@11.23.0",
-  "description": "Session modes (cozy/standard/challenge), pause-menu + rules/settings UI, and local-storage-backed run/progress recording, extracted from the arcade-cabinet shell.",
+  "description": "Session modes (cozy/standard/challenge), pause-menu + rules/settings UI, and local-storage-backed run/progress recording for browser games.",
   "type": "module",
   "license": "MIT",
   "publishConfig": {

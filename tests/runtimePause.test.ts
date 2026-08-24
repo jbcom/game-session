@@ -13,7 +13,7 @@ afterEach(() => {
 describe("cabinet runtime pause flag", () => {
   test("stores pause state on the document and emits pause changes", () => {
     const listener = vi.fn();
-    window.addEventListener("arcade-cabinet:pause-change", listener);
+    window.addEventListener("game-session:pause-change", listener);
 
     setCabinetRuntimePaused(true);
 
@@ -28,6 +28,6 @@ describe("cabinet runtime pause flag", () => {
     expect(isCabinetRuntimePaused()).toBe(false);
     expect(document.documentElement.dataset.cabinetPaused).toBe("false");
 
-    window.removeEventListener("arcade-cabinet:pause-change", listener);
+    window.removeEventListener("game-session:pause-change", listener);
   });
 });
