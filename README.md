@@ -1,4 +1,4 @@
-# @jbcom/game-session
+# @jbdevprimary/game-session
 
 Session modes, pause-menu and settings UI, and local-storage-backed run and
 progress recording for browser games.
@@ -8,11 +8,11 @@ difficulty posture the player picked, somewhere to keep their progress between
 visits, and a pause menu that stops the world without losing it. This package is
 those three things, split so you can take one without the others.
 
-- **`@jbcom/game-session`** — pure logic. Session modes, run results, progress
+- **`@jbdevprimary/game-session`** — pure logic. Session modes, run results, progress
   normalization, and a pause flag. No React, no DOM required.
-- **`@jbcom/game-session/react`** — a `useCabinetRuntime` hook plus plain
+- **`@jbdevprimary/game-session/react`** — a `useCabinetRuntime` hook plus plain
   functions over `localStorage`.
-- **`@jbcom/game-session/ui`** — presentational pause menu, settings panel, and
+- **`@jbdevprimary/game-session/ui`** — presentational pause menu, settings panel, and
   an error boundary.
 
 MIT licensed. Ships ESM and CommonJS with types for both.
@@ -20,7 +20,7 @@ MIT licensed. Ships ESM and CommonJS with types for both.
 ## Install
 
 ```sh
-npm install @jbcom/game-session
+npm install @jbdevprimary/game-session
 ```
 
 `react` and `lucide-react` are **optional** peer dependencies — you only need
@@ -28,7 +28,7 @@ them if you import the `/react` or `/ui` subpaths. The core entry point has no
 runtime dependencies at all.
 
 ```sh
-npm install @jbcom/game-session react lucide-react
+npm install @jbdevprimary/game-session react lucide-react
 ```
 
 Requires Node 22+ to build; the published output targets ES2022 browsers.
@@ -39,7 +39,7 @@ Three postures, `cozy` / `standard` / `challenge`, each with tuning a game can
 read instead of inventing its own difficulty constants.
 
 ```ts
-import { getSessionTuning, getSessionPressureScale } from "@jbcom/game-session";
+import { getSessionTuning, getSessionPressureScale } from "@jbdevprimary/game-session";
 
 const tuning = getSessionTuning("cozy");
 // tuning.targetMinutes        -> [10, 18]
@@ -60,7 +60,7 @@ need per-title tuning build their own
 ## Progress and runs
 
 ```ts
-import { beginGameRun, finishGameRun, readGameProgress } from "@jbcom/game-session/react";
+import { beginGameRun, finishGameRun, readGameProgress } from "@jbdevprimary/game-session/react";
 
 // Starts a run and writes the resume slot.
 const { progress, slot } = beginGameRun("my-game", "standard");
@@ -89,7 +89,7 @@ part of your game that pauses does not need a reference to the part that owns
 the menu.
 
 ```ts
-import { setCabinetRuntimePaused, isCabinetRuntimePaused } from "@jbcom/game-session";
+import { setCabinetRuntimePaused, isCabinetRuntimePaused } from "@jbdevprimary/game-session";
 
 function frame(dt: number) {
   if (isCabinetRuntimePaused()) return;
@@ -106,9 +106,9 @@ plus `setSettings` and `setProgress`.
 
 ```tsx
 import { useState } from "react";
-import { useCabinetRuntime } from "@jbcom/game-session/react";
-import { CabinetPauseMenu } from "@jbcom/game-session/ui";
-import { isCabinetRuntimePaused, setCabinetRuntimePaused } from "@jbcom/game-session";
+import { useCabinetRuntime } from "@jbdevprimary/game-session/react";
+import { CabinetPauseMenu } from "@jbdevprimary/game-session/ui";
+import { isCabinetRuntimePaused, setCabinetRuntimePaused } from "@jbdevprimary/game-session";
 
 function Game({ onReturnToCabinet }: { onReturnToCabinet: () => void }) {
   const { settings, saveSlot, setSettings, abandonRun } = useCabinetRuntime("my-game");
