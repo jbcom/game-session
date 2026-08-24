@@ -4,7 +4,7 @@
 // package's subpath exports are structured: index/react/ui).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import esbuild from "esbuild";
@@ -43,6 +43,18 @@ await esbuild.build({
   logLevel: "info",
 });
 
+// 3. Declarations for the CJS half. tsc emits only `.d.ts`, which Node resolves
+// as ESM because package.json says `"type": "module"` -- so a `require()`
+// consumer got types that claimed to be ESM while the runtime file was CJS
+// (arethetypeswrong: "Masquerading as ESM"). The declaration content is
+// identical; only the extension tells Node which module format it describes.
+const declarations = readdirSync(distDir).filter(
+  (file) => file.endsWith(".d.ts") && !file.endsWith(".d.cts")
+);
+for (const file of declarations) {
+  copyFileSync(path.join(distDir, file), path.join(distDir, file.replace(/\.d\.ts$/, ".d.cts")));
+}
+
 console.log(
-  `Built ${entryPoints.length} entry point(s) -> dist/ (ESM+d.ts via tsc, CJS via esbuild)`
+  `Built ${entryPoints.length} entry point(s) -> dist/ (ESM+d.ts via tsc, CJS+d.cts via esbuild)`
 );

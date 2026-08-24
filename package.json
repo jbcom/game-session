@@ -1,41 +1,74 @@
 {
-  "name": "@arcade-cabinet/session-runtime",
+  "name": "@jbcom/game-session",
   "version": "0.1.0",
+  "packageManager": "pnpm@11.23.0",
   "description": "Session modes (cozy/standard/challenge), pause-menu + rules/settings UI, and local-storage-backed run/progress recording, extracted from the arcade-cabinet shell.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "publishConfig": {
-    "access": "restricted"
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "dist"
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./react": {
-      "types": "./dist/react.d.ts",
-      "import": "./dist/react.js",
-      "require": "./dist/react.cjs"
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     },
     "./ui": {
-      "types": "./dist/ui.d.ts",
-      "import": "./dist/ui.js",
-      "require": "./dist/ui.cjs"
+      "import": {
+        "types": "./dist/ui.d.ts",
+        "default": "./dist/ui.js"
+      },
+      "require": {
+        "types": "./dist/ui.d.cts",
+        "default": "./dist/ui.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "react": [
+        "./dist/react.d.ts"
+      ],
+      "ui": [
+        "./dist/ui.d.ts"
+      ]
+    }
+  },
   "scripts": {
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "lucide-react": "^0.400.0"
+    "lucide-react": "^0.400.0",
+    "react": "^19.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -46,11 +79,12 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@biomejs/biome": "2.4.12",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.6.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "esbuild": "^0.24.0",
@@ -63,6 +97,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://redacted-private-registry.example/arcade-cabinet/session-runtime"
-  }
+    "url": "git+https://github.com/jbcom/game-session.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jbcom/game-session/issues"
+  },
+  "homepage": "https://github.com/jbcom/game-session#readme",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
+  "sideEffects": false
 }
