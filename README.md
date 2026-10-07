@@ -1,37 +1,50 @@
-# @jbdevprimary/game-session
+# game-session
 
-Session modes, pause-menu and settings UI, and local-storage-backed run and
-progress recording for browser games.
+[![CI](https://github.com/jbcom/game-session/actions/workflows/ci.yml/badge.svg)](https://github.com/jbcom/game-session/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/game-session.svg)](https://www.npmjs.com/package/game-session)
+[![MIT license](https://img.shields.io/badge/license-MIT-17324d.svg)](./LICENSE)
+
+Session modes, run and progress recording in `localStorage`, a module-level
+pause flag, a React hook, and pause-menu and settings UI for browser games.
 
 A game usually needs the same three things around its actual gameplay: a
 difficulty posture the player picked, somewhere to keep their progress between
 visits, and a pause menu that stops the world without losing it. This package is
 those three things, split so you can take one without the others.
 
-- **`@jbdevprimary/game-session`** — pure logic. Session modes, run results, progress
+- **`game-session`**: pure logic. Session modes, run results, progress
   normalization, and a pause flag. No React, no DOM required.
-- **`@jbdevprimary/game-session/react`** — a `useCabinetRuntime` hook plus plain
-  functions over `localStorage`.
-- **`@jbdevprimary/game-session/ui`** — presentational pause menu, settings panel, and
-  an error boundary.
+- **`game-session/react`**: a `useGameRuntime` hook plus plain functions over
+  `localStorage`.
+- **`game-session/ui`**: a presentational pause menu, settings panel, and error
+  boundary.
 
-MIT licensed. Ships ESM and CommonJS with types for both.
+Full documentation: **[jbcom.github.io/game-session](https://jbcom.github.io/game-session/)**
 
 ## Install
 
 ```sh
-npm install @jbdevprimary/game-session
+npm install game-session
 ```
 
-`react` and `lucide-react` are **optional** peer dependencies — you only need
-them if you import the `/react` or `/ui` subpaths. The core entry point has no
+`react` and `lucide-react` are **optional** peer dependencies. You only need
+them if you import the `/react` or `/ui` subpaths; the core entry point has no
 runtime dependencies at all.
 
 ```sh
-npm install @jbdevprimary/game-session react lucide-react
+npm install game-session react lucide-react
 ```
 
-Requires Node 22+ to build; the published output targets ES2022 browsers.
+Requirements:
+
+- Node.js 24 or newer for tooling (CI covers Node 24 and 26); the published
+  output targets ES2022 browsers.
+- React 19 for `/react` and `/ui`; `lucide-react` `>=0.400.0 <2` for `/ui`.
+- Tailwind CSS in the app that renders `/ui`: the components are styled with
+  utility classes and ship no stylesheet of their own.
+
+The package ships native ESM and CommonJS entry points with format-correct
+types for both.
 
 ## Session modes
 
@@ -39,7 +52,7 @@ Three postures, `cozy` / `standard` / `challenge`, each with tuning a game can
 read instead of inventing its own difficulty constants.
 
 ```ts
-import { getSessionTuning, getSessionPressureScale } from "@jbdevprimary/game-session";
+import { getSessionPressureScale, getSessionTuning } from "game-session";
 
 const tuning = getSessionTuning("cozy");
 // tuning.targetMinutes        -> [10, 18]
@@ -49,27 +62,29 @@ const tuning = getSessionTuning("cozy");
 spawnHazards(baseRate * getSessionPressureScale("challenge"));
 ```
 
-`normalizeSessionMode` accepts anything (a URL param, a stale localStorage
-value, `undefined`) and always returns a valid mode, so you never have to guard
-at the call site.
-
-`DEFAULT_SESSION_TUNING` is a starting point, not a straitjacket. Games that
-need per-title tuning build their own
+`normalizeSessionMode` accepts anything (a URL param, a stale stored value,
+`undefined`) and always returns a valid mode, so you never have to guard at the
+call site. `DEFAULT_SESSION_TUNING` is a starting point, not a straitjacket:
+games that need per-title tuning build their own
 `Record<string, Record<SessionMode, SessionTuning>>` on top of it.
 
-## Progress and runs
+## Runs and progress
 
 ```ts
-import { beginGameRun, finishGameRun, readGameProgress } from "@jbdevprimary/game-session/react";
+import { beginGameRun, finishGameRun, readGameProgress } from "game-session/react";
 
 // Starts a run and writes the resume slot.
-const { progress, slot } = beginGameRun("my-game", "standard");
+const { progress, slot } = beginGameRun("puzzle-quest", "standard");
 
 // ...player plays...
 
-const { result } = finishGameRun("my-game", { mode: "standard", status: "completed", score: 4200 });
+const { result } = finishGameRun("puzzle-quest", {
+  mode: "standard",
+  status: "completed",
+  score: 4200,
+});
 
-readGameProgress("my-game");
+readGameProgress("puzzle-quest");
 // -> { slug, bestScore, sessionsStarted, sessionsCompleted, totalPlayMs, ... }
 ```
 
@@ -77,10 +92,12 @@ readGameProgress("my-game");
 `abandonGameRun(slug)` is the same path with `status: "abandoned"`, and returns
 `undefined` when there was no run in flight.
 
-Everything is namespaced under a storage prefix you control
-(`DEFAULT_STORAGE_NAMESPACE` is `"game-session:v1"`); pass your own to keep
-two games on one origin from colliding. Reads normalize whatever they find, so
-a corrupted or older-shaped value degrades to defaults instead of throwing.
+Everything is stored under a key prefix you control. The default,
+`DEFAULT_STORAGE_NAMESPACE`, is `"game-session:v1"`, which every app on one
+origin shares, so pass your own namespace to keep two apps from colliding.
+Reads normalize whatever they find, so a corrupted or older-shaped value
+degrades to defaults instead of throwing, and a storage failure (quota,
+disabled storage, server rendering) is swallowed rather than thrown.
 
 ## Pausing
 
@@ -89,43 +106,43 @@ part of your game that pauses does not need a reference to the part that owns
 the menu.
 
 ```ts
-import { setCabinetRuntimePaused, isCabinetRuntimePaused } from "@jbdevprimary/game-session";
+import { isGameRuntimePaused } from "game-session";
 
 function frame(dt: number) {
-  if (isCabinetRuntimePaused()) return;
+  if (isGameRuntimePaused()) return;
   update(dt);
 }
 ```
 
 ## React
 
-`useCabinetRuntime(slug, options?)` keeps settings, progress, and the resume
-slot in component state and gives you the run lifecycle already bound to that
-slug: `beginRun`, `saveRun`, `updateRun`, `finishRun`, `abandonRun`, `clearRun`,
-plus `setSettings` and `setProgress`.
+`useGameRuntime(slug, options?)` keeps settings, progress, and the resume slot
+in component state and gives you the run lifecycle already bound to that slug:
+`beginRun`, `saveRun`, `updateRun`, `finishRun`, `abandonRun`, `clearRun`, plus
+`setSettings` and `setProgress`.
 
 ```tsx
 import { useState } from "react";
-import { useCabinetRuntime } from "@jbdevprimary/game-session/react";
-import { CabinetPauseMenu } from "@jbdevprimary/game-session/ui";
-import { isCabinetRuntimePaused, setCabinetRuntimePaused } from "@jbdevprimary/game-session";
+import { setGameRuntimePaused } from "game-session";
+import { useGameRuntime } from "game-session/react";
+import { GamePauseMenu } from "game-session/ui";
 
-function Game({ onReturnToCabinet }: { onReturnToCabinet: () => void }) {
-  const { settings, saveSlot, setSettings, abandonRun } = useCabinetRuntime("my-game");
+function Game({ onExit }: { onExit: () => void }) {
+  const { settings, saveSlot, setSettings, abandonRun } = useGameRuntime("puzzle-quest");
   const [paused, setPaused] = useState(false);
 
   return (
     <>
-      <Canvas />
-      <CabinetPauseMenu
-        gameTitle="My Game"
+      <GameCanvas />
+      <GamePauseMenu
+        gameTitle="Puzzle Quest"
         open={paused}
-        rules={["Collect the orbs.", "Do not touch the walls."]}
+        rules={["Match three tiles.", "Clear the board before time runs out."]}
         saveSlot={saveSlot}
         settings={settings}
-        onCabinet={onReturnToCabinet}
+        onMainMenu={onExit}
         onClose={() => {
-          setCabinetRuntimePaused(false);
+          setGameRuntimePaused(false);
           setPaused(false);
         }}
         onRestart={() => restartRun()}
@@ -137,15 +154,13 @@ function Game({ onReturnToCabinet }: { onReturnToCabinet: () => void }) {
 }
 ```
 
-Pause state is deliberately *not* owned by the hook — `setCabinetRuntimePaused`
-is a module-level flag so your render loop can read it without subscribing to
-React state.
+Pause state is deliberately *not* owned by the hook: `setGameRuntimePaused` is a
+module-level flag so your render loop can read it without subscribing to React
+state. The `/ui` components are presentational and take their handlers as
+props; they own no routing and no persistence, so they drop into an existing
+shell.
 
-The `/ui` components are presentational and take their handlers as props — they
-own no routing and no persistence, so they drop into an existing shell rather
-than asking you to build around them.
-
-## API
+## API overview
 
 | Export | Entry point | What it does |
 | --- | --- | --- |
@@ -157,25 +172,29 @@ than asking you to build around them.
 | `createEmptyProgress`, `normalizeGameProgress`, `markProgressStarted` | `.` | Progress shaping |
 | `normalizeGameSettings`, `DEFAULT_GAME_SETTINGS` | `.` | Settings shaping |
 | `createActiveSaveSlot`, `updateActiveSaveSlot`, `normalizeGameSaveSlot` | `.` | Save slots |
-| `setCabinetRuntimePaused`, `isCabinetRuntimePaused`, `clearCabinetRuntimePaused` | `.` | Pause flag |
-| `useCabinetRuntime` | `./react` | The hook tying storage to component state |
+| `setGameRuntimePaused`, `isGameRuntimePaused`, `clearGameRuntimePaused` | `.` | Pause flag |
+| `useGameRuntime` | `./react` | The hook tying storage to component state |
 | `beginGameRun`, `updateGameRun`, `finishGameRun`, `abandonGameRun` | `./react` | Run lifecycle |
-| `readCabinetSettings` / `writeCabinetSettings` | `./react` | Settings persistence |
-| `readGameProgress` / `writeGameProgress` | `./react` | Progress persistence |
-| `readGameSaveSlot` / `writeGameSaveSlot` / `clearGameSaveSlot` | `./react` | Save-slot persistence |
+| `readGameSettings`, `writeGameSettings` | `./react` | Settings persistence |
+| `readGameProgress`, `writeGameProgress` | `./react` | Progress persistence |
+| `readGameSaveSlot`, `writeGameSaveSlot`, `clearGameSaveSlot` | `./react` | Save-slot persistence |
 | `applySettingsToDocument` | `./react` | Push settings onto the document |
-| `CabinetPauseMenu`, `CabinetSettingsPanel`, `CabinetMenuButton` | `./ui` | Pause and settings UI |
+| `GamePauseMenu`, `GameSettingsPanel`, `GameMenuButton` | `./ui` | Pause and settings UI |
 | `RuntimeResultRecorder` | `./ui` | Records a result on mount |
-| `CabinetErrorBoundary` | `./ui` | Error boundary |
+| `GameErrorBoundary` | `./ui` | Error boundary with a return-to-menu fallback |
 
-## Contributing
+Every export is documented with TSDoc, and the signatures live in the
+[API reference](./docs/API.md).
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). The whole gate is one command:
+## Documentation
 
-```sh
-pnpm verify   # lint, typecheck, test, build
-```
+- [API reference](./docs/API.md): every export, its parameters and behavior.
+- [Architecture](./docs/ARCHITECTURE.md): module boundaries, storage keys,
+  invariants and intentional limits.
+- [Migrating from the earlier names](./docs/MIGRATION.md): the rename mapping
+  for code written against the `Cabinet*` API.
+- [CONTRIBUTING.md](./CONTRIBUTING.md): local setup and the `pnpm verify` gate.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT. See [LICENSE](./LICENSE).
