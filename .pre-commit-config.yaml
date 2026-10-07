@@ -5,6 +5,8 @@ repos:
     hooks:
       - id: check-merge-conflict
       - id: check-yaml
+        # pnpm 12 lockfiles use a multi-document YAML stream.
+        args: [--allow-multiple-documents]
       - id: check-json
       - id: check-toml
       - id: detect-private-key
