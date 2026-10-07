@@ -140,7 +140,7 @@
   },
   "homepage": "https://jbcom.github.io/game-session/",
   "engines": {
-    "node": ">=24"
+    "node": ">=22"
   },
   "packageManager": "pnpm@12.10.1",
   "author": "Jon Bogaty <jon@jonbogaty.com>",
