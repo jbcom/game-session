@@ -1,6 +1,6 @@
 {
   "name": "game-session",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Session modes, run and progress recording in localStorage, a module-level pause flag, a React hook, and pause-menu and settings UI for browser games.",
   "type": "module",
   "license": "MIT",
