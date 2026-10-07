@@ -1,9 +1,10 @@
 packages:
   - .
+  - docs
 
-# esbuild ships a platform-native binary installed by its postinstall script.
-# The host workspace declared this; standalone the package must declare it
-# itself or every `pnpm run` fails its dependency preflight before the script
-# even starts, and `scripts/build.mjs` has no esbuild binary to invoke.
+# pnpm blocks dependency install scripts by default. Allow exactly the ones the
+# toolchain needs: esbuild's and sharp's native binaries (Sourcey's docs build).
 allowBuilds:
   esbuild: true
+  sharp: true
+  simple-git-hooks: true

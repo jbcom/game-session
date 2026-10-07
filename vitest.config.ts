@@ -16,7 +16,7 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/**/*.d.ts"],
-      reporter: ["text", "html", "json-summary"],
+      reporter: ["text", "json", "html", "lcov"],
       thresholds: {
         lines: 100,
         branches: 100,
