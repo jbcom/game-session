@@ -9,19 +9,19 @@
 import { describe, expect, test } from "vitest";
 import { applySettingsToDocument, readGameProgress } from "../src/react";
 import {
-  clearCabinetRuntimePaused,
-  isCabinetRuntimePaused,
-  setCabinetRuntimePaused,
+  clearGameRuntimePaused,
+  isGameRuntimePaused,
+  setGameRuntimePaused,
 } from "../src/runtimePause";
 
-describe("cabinet runtime pause flag without a DOM", () => {
-  test("setCabinetRuntimePaused is a no-op and isCabinetRuntimePaused reads false", () => {
+describe("game runtime pause flag without a DOM", () => {
+  test("setGameRuntimePaused is a no-op and isGameRuntimePaused reads false", () => {
     expect(typeof document).toBe("undefined");
 
-    expect(() => setCabinetRuntimePaused(true)).not.toThrow();
-    expect(isCabinetRuntimePaused()).toBe(false);
+    expect(() => setGameRuntimePaused(true)).not.toThrow();
+    expect(isGameRuntimePaused()).toBe(false);
 
-    clearCabinetRuntimePaused();
+    clearGameRuntimePaused();
   });
 });
 

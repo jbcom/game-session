@@ -9,7 +9,7 @@ import {
 } from "../src/sessionMode";
 
 describe("session mode tuning", () => {
-  test("normalizes unknown values to the default cabinet mode", () => {
+  test("normalizes unknown values to the default mode", () => {
     expect(normalizeSessionMode("cozy")).toBe("cozy");
     expect(normalizeSessionMode("challenge")).toBe("challenge");
     expect(normalizeSessionMode("broken")).toBe("standard");

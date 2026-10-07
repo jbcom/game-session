@@ -2,10 +2,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { useLayoutEffect, useRef } from "react";
 import { beforeEach, describe, expect, test } from "vitest";
-import { applySettingsToDocument, useCabinetRuntime } from "../src/react";
+import { applySettingsToDocument, useGameRuntime } from "../src/react";
 import { DEFAULT_GAME_SETTINGS } from "../src/runtime";
 
-describe("useCabinetRuntime", () => {
+describe("useGameRuntime", () => {
   beforeEach(() => {
     localStorage.clear();
     delete document.documentElement.dataset.reducedMotion;
@@ -14,7 +14,7 @@ describe("useCabinetRuntime", () => {
   });
 
   test("with no slug, exposes settings but no progress/save-slot state", () => {
-    const { result } = renderHook(() => useCabinetRuntime());
+    const { result } = renderHook(() => useGameRuntime());
 
     expect(result.current.settings).toEqual(DEFAULT_GAME_SETTINGS);
     expect(result.current.progress).toBeUndefined();
@@ -22,19 +22,19 @@ describe("useCabinetRuntime", () => {
   });
 
   test("loads existing progress and save slot for a slug on mount", () => {
-    const { result: seed } = renderHook(() => useCabinetRuntime("hook-game"));
+    const { result: seed } = renderHook(() => useGameRuntime("hook-game"));
     act(() => {
       seed.current.beginRun("cozy", { progressSummary: "Room 1" });
     });
 
-    const { result } = renderHook(() => useCabinetRuntime("hook-game"));
+    const { result } = renderHook(() => useGameRuntime("hook-game"));
 
     expect(result.current.progress).toMatchObject({ sessionsStarted: 1 });
     expect(result.current.saveSlot).toMatchObject({ progressSummary: "Room 1" });
   });
 
   test("setSettings normalizes, persists, and pushes settings onto the document", () => {
-    const { result } = renderHook(() => useCabinetRuntime());
+    const { result } = renderHook(() => useGameRuntime());
 
     act(() => {
       result.current.setSettings({
@@ -50,12 +50,12 @@ describe("useCabinetRuntime", () => {
     expect(document.documentElement.dataset.graphicsQuality).toBe("high");
 
     // and it round-trips through storage
-    const { result: reloaded } = renderHook(() => useCabinetRuntime());
+    const { result: reloaded } = renderHook(() => useGameRuntime());
     expect(reloaded.current.settings.graphicsQuality).toBe("high");
   });
 
   test("setSettings accepts an updater function", () => {
-    const { result } = renderHook(() => useCabinetRuntime());
+    const { result } = renderHook(() => useGameRuntime());
 
     act(() => {
       result.current.setSettings((current) => ({ ...current, soundEnabled: false }));
@@ -65,13 +65,13 @@ describe("useCabinetRuntime", () => {
   });
 
   test("setProgress is a no-op without a slug, and updates state+storage with one", () => {
-    const { result: noSlug } = renderHook(() => useCabinetRuntime());
+    const { result: noSlug } = renderHook(() => useGameRuntime());
     act(() => {
       noSlug.current.setProgress((current) => current ?? ({} as never));
     });
     expect(noSlug.current.progress).toBeUndefined();
 
-    const { result } = renderHook(() => useCabinetRuntime("progress-game"));
+    const { result } = renderHook(() => useGameRuntime("progress-game"));
     act(() => {
       result.current.setProgress((current) => ({
         ...(current ?? {
@@ -92,12 +92,12 @@ describe("useCabinetRuntime", () => {
 
     expect(result.current.progress?.bestScore).toBe(500);
 
-    const { result: reloaded } = renderHook(() => useCabinetRuntime("progress-game"));
+    const { result: reloaded } = renderHook(() => useGameRuntime("progress-game"));
     expect(reloaded.current.progress?.bestScore).toBe(500);
   });
 
   test("setProgress accepts a plain GameProgress value in addition to an updater function", () => {
-    const { result } = renderHook(() => useCabinetRuntime("plain-progress-game"));
+    const { result } = renderHook(() => useGameRuntime("plain-progress-game"));
 
     act(() => {
       result.current.setProgress({
@@ -126,7 +126,7 @@ describe("useCabinetRuntime", () => {
     // stale `undefined` state and must not crash on `undefined.bestScore`.
     const { result, rerender } = renderHook(
       ({ slug }: { slug?: string }) => {
-        const runtime = useCabinetRuntime(slug);
+        const runtime = useGameRuntime(slug);
         const prevSlug = useRef(slug);
         useLayoutEffect(() => {
           if (slug && !prevSlug.current) {
@@ -149,7 +149,7 @@ describe("useCabinetRuntime", () => {
   });
 
   test("beginRun is a no-op without a slug", () => {
-    const { result } = renderHook(() => useCabinetRuntime());
+    const { result } = renderHook(() => useGameRuntime());
     let returned: unknown;
 
     act(() => {
@@ -161,7 +161,7 @@ describe("useCabinetRuntime", () => {
   });
 
   test("beginRun with a slug seeds progress and an active save slot", () => {
-    const { result } = renderHook(() => useCabinetRuntime("begin-game"));
+    const { result } = renderHook(() => useGameRuntime("begin-game"));
 
     act(() => {
       result.current.beginRun("challenge", { progressSummary: "Wave 1" });
@@ -179,7 +179,7 @@ describe("useCabinetRuntime", () => {
   });
 
   test("saveRun writes an arbitrary slot directly and updates state", () => {
-    const { result } = renderHook(() => useCabinetRuntime("save-game"));
+    const { result } = renderHook(() => useGameRuntime("save-game"));
 
     act(() => {
       result.current.saveRun({
@@ -195,19 +195,19 @@ describe("useCabinetRuntime", () => {
 
     expect(result.current.saveSlot).toMatchObject({ progressSummary: "Custom checkpoint" });
 
-    const { result: reloaded } = renderHook(() => useCabinetRuntime("save-game"));
+    const { result: reloaded } = renderHook(() => useGameRuntime("save-game"));
     expect(reloaded.current.saveSlot).toMatchObject({ progressSummary: "Custom checkpoint" });
   });
 
   test("updateRun is a no-op without a slug, undefined with no active run, and patches an active run", () => {
-    const { result: noSlug } = renderHook(() => useCabinetRuntime());
+    const { result: noSlug } = renderHook(() => useGameRuntime());
     let returned: unknown;
     act(() => {
       returned = noSlug.current.updateRun({ progressSummary: "nope" });
     });
     expect(returned).toBeUndefined();
 
-    const { result } = renderHook(() => useCabinetRuntime("update-game"));
+    const { result } = renderHook(() => useGameRuntime("update-game"));
     act(() => {
       returned = result.current.updateRun({ progressSummary: "no active run" });
     });
@@ -226,13 +226,13 @@ describe("useCabinetRuntime", () => {
   });
 
   test("clearRun is a no-op without a slug, and clears the active save slot with one", () => {
-    const { result: noSlug } = renderHook(() => useCabinetRuntime());
+    const { result: noSlug } = renderHook(() => useGameRuntime());
     act(() => {
       noSlug.current.clearRun();
     });
     expect(noSlug.current.saveSlot).toBeUndefined();
 
-    const { result } = renderHook(() => useCabinetRuntime("clear-game"));
+    const { result } = renderHook(() => useGameRuntime("clear-game"));
     act(() => {
       result.current.beginRun("standard");
     });
@@ -246,14 +246,14 @@ describe("useCabinetRuntime", () => {
   });
 
   test("finishRun is a no-op without a slug, and records a result with one", () => {
-    const { result: noSlug } = renderHook(() => useCabinetRuntime());
+    const { result: noSlug } = renderHook(() => useGameRuntime());
     let returned: unknown;
     act(() => {
       returned = noSlug.current.finishRun({ mode: "standard", status: "completed", score: 10 });
     });
     expect(returned).toBeUndefined();
 
-    const { result } = renderHook(() => useCabinetRuntime("finish-game"));
+    const { result } = renderHook(() => useGameRuntime("finish-game"));
     act(() => {
       result.current.beginRun("standard");
     });
@@ -269,14 +269,14 @@ describe("useCabinetRuntime", () => {
   });
 
   test("abandonRun is a no-op without a slug, undefined with no active run, and records abandonment with one", () => {
-    const { result: noSlug } = renderHook(() => useCabinetRuntime());
+    const { result: noSlug } = renderHook(() => useGameRuntime());
     let returned: unknown;
     act(() => {
       returned = noSlug.current.abandonRun();
     });
     expect(returned).toBeUndefined();
 
-    const { result } = renderHook(() => useCabinetRuntime("abandon-game"));
+    const { result } = renderHook(() => useGameRuntime("abandon-game"));
     act(() => {
       returned = result.current.abandonRun();
     });
@@ -297,7 +297,7 @@ describe("useCabinetRuntime", () => {
   test("re-runs the load effect when slug or namespace changes", () => {
     const { result, rerender } = renderHook(
       ({ slug, namespace }: { slug?: string; namespace?: string }) =>
-        useCabinetRuntime(slug, { namespace }),
+        useGameRuntime(slug, { namespace }),
       { initialProps: { slug: "slug-a", namespace: "ns-a" } }
     );
 
@@ -335,8 +335,8 @@ describe("applySettingsToDocument", () => {
     expect(document.documentElement.dataset.reducedMotion).toBe("true");
     expect(document.documentElement.dataset.graphicsQuality).toBe("low");
     expect(document.documentElement.dataset.handedness).toBe("left");
-    expect(document.documentElement.style.getPropertyValue("--cabinet-text-scale")).toBe("1.1");
-    expect(document.documentElement.style.getPropertyValue("--cabinet-joystick-sensitivity")).toBe(
+    expect(document.documentElement.style.getPropertyValue("--game-text-scale")).toBe("1.1");
+    expect(document.documentElement.style.getPropertyValue("--game-joystick-sensitivity")).toBe(
       "0.8"
     );
   });

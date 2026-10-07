@@ -84,7 +84,7 @@ export interface GameProgress {
 /**
  * A player's cross-game settings -- audio, motion, graphics tier, handedness,
  * and input tuning. One record applies to every game sharing a storage
- * namespace; see {@link readCabinetSettings}/{@link writeCabinetSettings}.
+ * namespace; see {@link readGameSettings}/{@link writeGameSettings}.
  */
 export interface GameSettings {
   /** Whether sound effects and music should play. */
@@ -428,7 +428,7 @@ export function normalizeGameSaveSlot(
   slug: string,
   value: Partial<GameSaveSlot> | null | undefined
 ): GameSaveSlot | undefined {
-  if (!value || value.status !== "active") return undefined;
+  if (value?.status !== "active") return undefined;
 
   return {
     slug,

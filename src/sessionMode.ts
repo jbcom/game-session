@@ -22,7 +22,7 @@ export interface DifficultyVariant {
 
 /**
  * Descriptive metadata for a game's session catalog entry -- the copy a
- * cabinet menu or game-select screen needs to introduce a title before the
+ * main menu or game-select screen needs to introduce a title before the
  * player starts a run. Not persisted or read by this package; consumers
  * define and pass their own values.
  */
@@ -90,9 +90,8 @@ export const DEFAULT_DIFFICULTY_VARIANTS: readonly DifficultyVariant[] = [
 
 /**
  * Default per-mode tuning. Consumers that need per-game tuning overrides
- * (a host app's own tuning registry) should
- * build their own `Record<string, Record<SessionMode, SessionTuning>>` on
- * top of this — that registry is app-specific, not part of this package.
+ * should build their own `Record<string, Record<SessionMode, SessionTuning>>`
+ * on top of this -- that registry belongs to the host app, not to this package.
  */
 export const DEFAULT_SESSION_TUNING: Record<SessionMode, SessionTuning> = {
   cozy: {
@@ -111,7 +110,7 @@ export const DEFAULT_SESSION_TUNING: Record<SessionMode, SessionTuning> = {
     mistakeRecoveryCount: 2,
     pressureScale: 1,
     recoveryScale: 1,
-    description: "Default cabinet tuning for an 8-15 minute replayable run.",
+    description: "Default tuning for an 8-15 minute replayable run.",
   },
   challenge: {
     mode: "challenge",

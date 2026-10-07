@@ -3,9 +3,9 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   clearGameSaveSlot,
   DEFAULT_STORAGE_NAMESPACE,
-  readCabinetSettings,
   readGameProgress,
-  writeCabinetSettings,
+  readGameSettings,
+  writeGameSettings,
 } from "../src/react";
 
 function throwingStorage(): Storage {
@@ -30,20 +30,20 @@ describe("storage failure resilience", () => {
     localStorage.clear();
   });
 
-  test("readCabinetSettings falls back to defaults when storage.getItem throws", () => {
-    const settings = readCabinetSettings(throwingStorage(), DEFAULT_STORAGE_NAMESPACE);
+  test("readGameSettings falls back to defaults when storage.getItem throws", () => {
+    const settings = readGameSettings(throwingStorage(), DEFAULT_STORAGE_NAMESPACE);
     expect(settings.soundEnabled).toBe(true);
   });
 
-  test("readCabinetSettings falls back to defaults when the stored value is corrupt JSON", () => {
+  test("readGameSettings falls back to defaults when the stored value is corrupt JSON", () => {
     localStorage.setItem(`${DEFAULT_STORAGE_NAMESPACE}:settings`, "{not-json");
-    const settings = readCabinetSettings();
+    const settings = readGameSettings();
     expect(settings.soundEnabled).toBe(true);
   });
 
-  test("writeCabinetSettings does not throw when storage.setItem throws (e.g. quota exceeded)", () => {
+  test("writeGameSettings does not throw when storage.setItem throws (e.g. quota exceeded)", () => {
     expect(() =>
-      writeCabinetSettings(
+      writeGameSettings(
         {
           graphicsQuality: "balanced",
           handedness: "right",

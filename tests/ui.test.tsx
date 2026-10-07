@@ -5,10 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { GameSettings } from "../src/runtime";
 import {
-  CabinetErrorBoundary,
-  CabinetMenuButton,
-  CabinetPauseMenu,
-  CabinetSettingsPanel,
+  GameErrorBoundary,
+  GameMenuButton,
+  GamePauseMenu,
+  GameSettingsPanel,
   RuntimeResultRecorder,
 } from "../src/ui";
 
@@ -22,28 +22,25 @@ const settings: GameSettings = {
   textScale: 1,
 };
 
-describe("CabinetMenuButton", () => {
+describe("GameMenuButton", () => {
   test("carries data-joystick-ignore so the virtual joystick never captures it", () => {
-    render(<CabinetMenuButton onClick={() => {}} />);
-    expect(screen.getByTestId("cabinet-menu-button")).toHaveAttribute(
-      "data-joystick-ignore",
-      "true"
-    );
+    render(<GameMenuButton onClick={() => {}} />);
+    expect(screen.getByTestId("game-menu-button")).toHaveAttribute("data-joystick-ignore", "true");
   });
 });
 
-describe("CabinetPauseMenu", () => {
-  test("renders resume/restart/settings/rules/cabinet/quit actions when open", async () => {
+describe("GamePauseMenu", () => {
+  test("renders resume/restart/settings/rules/main-menu/quit actions when open", async () => {
     const onClose = vi.fn();
     const onRestart = vi.fn();
 
     render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         rules={["Rule one"]}
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={onClose}
         onQuitRun={() => {}}
         onRestart={onRestart}
@@ -51,7 +48,7 @@ describe("CabinetPauseMenu", () => {
       />
     );
 
-    expect(screen.getByTestId("cabinet-pause-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("game-pause-menu")).toBeInTheDocument();
     expect(screen.getByText("Resume")).toBeInTheDocument();
     expect(screen.getByText("Restart")).toBeInTheDocument();
 
@@ -59,13 +56,46 @@ describe("CabinetPauseMenu", () => {
     expect(onRestart).toHaveBeenCalledTimes(1);
   });
 
+  test("shows the eyebrow line above the title only when one is given", () => {
+    const { rerender } = render(
+      <GamePauseMenu
+        eyebrow="Example Studio"
+        gameTitle="Test Game"
+        open
+        settings={settings}
+        onMainMenu={() => {}}
+        onClose={() => {}}
+        onQuitRun={() => {}}
+        onRestart={() => {}}
+        onSettingsChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText("Example Studio")).toBeInTheDocument();
+
+    rerender(
+      <GamePauseMenu
+        gameTitle="Test Game"
+        open
+        settings={settings}
+        onMainMenu={() => {}}
+        onClose={() => {}}
+        onQuitRun={() => {}}
+        onRestart={() => {}}
+        onSettingsChange={() => {}}
+      />
+    );
+
+    expect(screen.queryByText("Example Studio")).not.toBeInTheDocument();
+  });
+
   test("renders nothing when closed", () => {
     const { container } = render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open={false}
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -78,7 +108,7 @@ describe("CabinetPauseMenu", () => {
 
   test("shows the active-run banner when a save slot is present", () => {
     render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         saveSlot={{
@@ -91,7 +121,7 @@ describe("CabinetPauseMenu", () => {
           progressSummary: "Wave 3",
         }}
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -102,17 +132,17 @@ describe("CabinetPauseMenu", () => {
     expect(screen.getByText(/Active run: Wave 3/)).toBeInTheDocument();
   });
 
-  test("disables the Rules action when no rules are given, and calls onClose/onQuitRun/onCabinet", async () => {
+  test("disables the Rules action when no rules are given, and calls onClose/onQuitRun/onMainMenu", async () => {
     const onClose = vi.fn();
     const onQuitRun = vi.fn();
-    const onCabinet = vi.fn();
+    const onMainMenu = vi.fn();
 
     render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         settings={settings}
-        onCabinet={onCabinet}
+        onMainMenu={onMainMenu}
         onClose={onClose}
         onQuitRun={onQuitRun}
         onRestart={() => {}}
@@ -128,19 +158,19 @@ describe("CabinetPauseMenu", () => {
     await userEvent.click(screen.getByText("Quit Run"));
     expect(onQuitRun).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByText("Cabinet"));
-    expect(onCabinet).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByText("Main Menu"));
+    expect(onMainMenu).toHaveBeenCalledTimes(1);
   });
 
   test("navigates into the settings panel, changes settings, and returns to the main menu", async () => {
     const onSettingsChange = vi.fn();
 
     render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -149,7 +179,7 @@ describe("CabinetPauseMenu", () => {
     );
 
     await userEvent.click(screen.getByText("Settings"));
-    const panel = screen.getByTestId("cabinet-settings-panel");
+    const panel = screen.getByTestId("game-settings-panel");
     expect(panel).toBeInTheDocument();
     expect(screen.getByText("Settings", { selector: "h2" })).toBeInTheDocument();
 
@@ -160,18 +190,18 @@ describe("CabinetPauseMenu", () => {
     expect(updater(settings).soundEnabled).toBe(false);
 
     await userEvent.click(within(panel).getByText("Back"));
-    expect(screen.queryByTestId("cabinet-settings-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-settings-panel")).not.toBeInTheDocument();
     expect(screen.getByText("Resume")).toBeInTheDocument();
   });
 
   test("navigates into the rules panel, lists rules in order, and returns to the main menu", async () => {
     render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         rules={["Collect the orbs.", "Do not touch the walls."]}
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -180,21 +210,21 @@ describe("CabinetPauseMenu", () => {
     );
 
     await userEvent.click(screen.getByText("Rules"));
-    const panel = screen.getByTestId("cabinet-rules-panel");
+    const panel = screen.getByTestId("game-rules-panel");
     expect(within(panel).getByText("Collect the orbs.")).toBeInTheDocument();
     expect(within(panel).getByText("Do not touch the walls.")).toBeInTheDocument();
 
     await userEvent.click(within(panel).getByText("Back"));
-    expect(screen.queryByTestId("cabinet-rules-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-rules-panel")).not.toBeInTheDocument();
   });
 
   test("resets to the menu view whenever it is reopened", async () => {
     const { rerender } = render(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -203,14 +233,14 @@ describe("CabinetPauseMenu", () => {
     );
 
     await userEvent.click(screen.getByText("Settings"));
-    expect(screen.getByTestId("cabinet-settings-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("game-settings-panel")).toBeInTheDocument();
 
     rerender(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open={false}
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -218,11 +248,11 @@ describe("CabinetPauseMenu", () => {
       />
     );
     rerender(
-      <CabinetPauseMenu
+      <GamePauseMenu
         gameTitle="Test Game"
         open
         settings={settings}
-        onCabinet={() => {}}
+        onMainMenu={() => {}}
         onClose={() => {}}
         onQuitRun={() => {}}
         onRestart={() => {}}
@@ -230,17 +260,17 @@ describe("CabinetPauseMenu", () => {
       />
     );
 
-    expect(screen.queryByTestId("cabinet-settings-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-settings-panel")).not.toBeInTheDocument();
     expect(screen.getByText("Resume")).toBeInTheDocument();
   });
 });
 
-describe("CabinetSettingsPanel", () => {
+describe("GameSettingsPanel", () => {
   test("toggles booleans, changes segmented and range settings via onSettingsChange updater", async () => {
     const onSettingsChange = vi.fn();
 
     render(
-      <CabinetSettingsPanel
+      <GameSettingsPanel
         settings={settings}
         onBack={() => {}}
         onSettingsChange={onSettingsChange}
@@ -276,9 +306,7 @@ describe("CabinetSettingsPanel", () => {
 
   test("calls onBack when the back button is clicked", async () => {
     const onBack = vi.fn();
-    render(
-      <CabinetSettingsPanel settings={settings} onBack={onBack} onSettingsChange={() => {}} />
-    );
+    render(<GameSettingsPanel settings={settings} onBack={onBack} onSettingsChange={() => {}} />);
 
     await userEvent.click(screen.getByText("Back"));
     expect(onBack).toHaveBeenCalledTimes(1);
@@ -286,7 +314,7 @@ describe("CabinetSettingsPanel", () => {
 
   test("shows the muted icon when sound is disabled", () => {
     render(
-      <CabinetSettingsPanel
+      <GameSettingsPanel
         settings={{ ...settings, soundEnabled: false }}
         onBack={() => {}}
         onSettingsChange={() => {}}
@@ -308,19 +336,19 @@ function fireEventChange(element: HTMLElement, value: string) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-describe("CabinetErrorBoundary", () => {
+describe("GameErrorBoundary", () => {
   test("renders children when there is no error", () => {
     render(
-      <CabinetErrorBoundary>
+      <GameErrorBoundary>
         <p>All good</p>
-      </CabinetErrorBoundary>
+      </GameErrorBoundary>
     );
 
     expect(screen.getByText("All good")).toBeInTheDocument();
   });
 
-  test("catches a render error and shows the fallback with a return-to-cabinet action", async () => {
-    const onReturnToCabinet = vi.fn();
+  test("catches a render error and shows the fallback with a return-to-menu action", async () => {
+    const onReturnToMenu = vi.fn();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
     function Boom(): never {
@@ -328,16 +356,16 @@ describe("CabinetErrorBoundary", () => {
     }
 
     render(
-      <CabinetErrorBoundary onReturnToCabinet={onReturnToCabinet}>
+      <GameErrorBoundary onReturnToMenu={onReturnToMenu}>
         <Boom />
-      </CabinetErrorBoundary>
+      </GameErrorBoundary>
     );
 
-    const returnButton = screen.getByRole("button", { name: "Return To Cabinet" });
+    const returnButton = screen.getByRole("button", { name: "Return To Menu" });
     expect(returnButton).toBeInTheDocument();
 
     await userEvent.click(returnButton);
-    expect(onReturnToCabinet).toHaveBeenCalledTimes(1);
+    expect(onReturnToMenu).toHaveBeenCalledTimes(1);
 
     consoleError.mockRestore();
   });
@@ -351,17 +379,17 @@ describe("CabinetErrorBoundary", () => {
     }
 
     const { rerender } = render(
-      <CabinetErrorBoundary boundaryKey="game-1">
+      <GameErrorBoundary boundaryKey="game-1">
         <MaybeBoom shouldThrow />
-      </CabinetErrorBoundary>
+      </GameErrorBoundary>
     );
 
-    expect(screen.getByRole("button", { name: "Return To Cabinet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Return To Menu" })).toBeInTheDocument();
 
     rerender(
-      <CabinetErrorBoundary boundaryKey="game-2">
+      <GameErrorBoundary boundaryKey="game-2">
         <MaybeBoom shouldThrow={false} />
-      </CabinetErrorBoundary>
+      </GameErrorBoundary>
     );
 
     expect(screen.getByText("Recovered")).toBeInTheDocument();
@@ -387,8 +415,8 @@ describe("RuntimeResultRecorder", () => {
     );
 
     // Re-render with identical props: must not double-record (bestScore stays 100,
-    // sessionsCompleted stays 1) -- this is the exact correctness property the
-    // tournament ledger called out (a useRef-guarded resultKey).
+    // sessionsCompleted stays 1) -- the recorder guards its result key with a ref
+    // so unrelated re-renders never record the same run twice.
     rerender(
       <RuntimeResultRecorder
         mode="standard"

@@ -1,32 +1,32 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
-  clearCabinetRuntimePaused,
-  isCabinetRuntimePaused,
-  setCabinetRuntimePaused,
+  clearGameRuntimePaused,
+  isGameRuntimePaused,
+  setGameRuntimePaused,
 } from "../src/runtimePause";
 
 afterEach(() => {
-  clearCabinetRuntimePaused();
+  clearGameRuntimePaused();
 });
 
-describe("cabinet runtime pause flag", () => {
+describe("game runtime pause flag", () => {
   test("stores pause state on the document and emits pause changes", () => {
     const listener = vi.fn();
     window.addEventListener("game-session:pause-change", listener);
 
-    setCabinetRuntimePaused(true);
+    setGameRuntimePaused(true);
 
-    expect(isCabinetRuntimePaused()).toBe(true);
-    expect(document.documentElement.dataset.cabinetPaused).toBe("true");
+    expect(isGameRuntimePaused()).toBe(true);
+    expect(document.documentElement.dataset.gamePaused).toBe("true");
     expect(listener).toHaveBeenLastCalledWith(
       expect.objectContaining({ detail: { paused: true } })
     );
 
-    clearCabinetRuntimePaused();
+    clearGameRuntimePaused();
 
-    expect(isCabinetRuntimePaused()).toBe(false);
-    expect(document.documentElement.dataset.cabinetPaused).toBe("false");
+    expect(isGameRuntimePaused()).toBe(false);
+    expect(document.documentElement.dataset.gamePaused).toBe("false");
 
     window.removeEventListener("game-session:pause-change", listener);
   });

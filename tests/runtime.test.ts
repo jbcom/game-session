@@ -35,7 +35,7 @@ describe("session-runtime models", () => {
 
   test("tracks started sessions and finished results deterministically", () => {
     const started = markProgressStarted(
-      createEmptyProgress("mega-track", "cozy", new Date("2026-04-22T12:00:00.000Z")),
+      createEmptyProgress("track-day", "cozy", new Date("2026-04-22T12:00:00.000Z")),
       "challenge",
       new Date("2026-04-22T12:01:00.000Z")
     );
@@ -44,7 +44,7 @@ describe("session-runtime models", () => {
       endedAt: "2026-04-22T12:11:00.000Z",
       mode: "challenge",
       score: 4200,
-      slug: "mega-track",
+      slug: "track-day",
       startedAt: "2026-04-22T12:01:00.000Z",
       status: "completed",
       summary: "Cup cleared",
@@ -61,12 +61,12 @@ describe("session-runtime models", () => {
   });
 
   test("recordGameResult increments failed and abandoned counters instead of completed", () => {
-    const empty = createEmptyProgress("mega-track");
+    const empty = createEmptyProgress("track-day");
 
     const failed = recordGameResult(
       empty,
       createGameResult({
-        slug: "mega-track",
+        slug: "track-day",
         mode: "standard",
         status: "failed",
         score: 10,
@@ -81,7 +81,7 @@ describe("session-runtime models", () => {
     const abandoned = recordGameResult(
       empty,
       createGameResult({
-        slug: "mega-track",
+        slug: "track-day",
         mode: "standard",
         status: "abandoned",
         score: 10,
@@ -95,23 +95,23 @@ describe("session-runtime models", () => {
   });
 
   test("createEmptyProgress defaults to standard mode when none is given", () => {
-    expect(createEmptyProgress("mega-track").lastSelectedMode).toBe("standard");
+    expect(createEmptyProgress("track-day").lastSelectedMode).toBe("standard");
   });
 
   test("normalizes persisted progress and save slots by current game slug", () => {
-    const progress = normalizeGameProgress("farm-follies", {
+    const progress = normalizeGameProgress("harvest-hop", {
       bestScore: -2,
       lastSelectedMode: "invalid" as never,
       sessionsStarted: 2.8,
       updatedAt: "2026-04-22T12:00:00.000Z",
     });
 
-    expect(progress.slug).toBe("farm-follies");
+    expect(progress.slug).toBe("harvest-hop");
     expect(progress.bestScore).toBe(0);
     expect(progress.lastSelectedMode).toBe("standard");
     expect(progress.sessionsStarted).toBe(2);
 
-    const slot = normalizeGameSaveSlot("farm-follies", {
+    const slot = normalizeGameSaveSlot("harvest-hop", {
       mode: "cozy",
       progressSummary: "Tier 5 tower",
       status: "active",
@@ -120,16 +120,16 @@ describe("session-runtime models", () => {
     expect(slot).toMatchObject({
       mode: "cozy",
       progressSummary: "Tier 5 tower",
-      slug: "farm-follies",
+      slug: "harvest-hop",
       status: "active",
     });
   });
 
   test("normalizeGameSaveSlot rejects non-active or missing values and fills in blank fields", () => {
-    expect(normalizeGameSaveSlot("farm-follies", undefined)).toBeUndefined();
-    expect(normalizeGameSaveSlot("farm-follies", { status: undefined })).toBeUndefined();
+    expect(normalizeGameSaveSlot("harvest-hop", undefined)).toBeUndefined();
+    expect(normalizeGameSaveSlot("harvest-hop", { status: undefined })).toBeUndefined();
     expect(
-      normalizeGameSaveSlot("farm-follies", {
+      normalizeGameSaveSlot("harvest-hop", {
         status: "active",
         label: "",
         progressSummary: "",
@@ -141,7 +141,7 @@ describe("session-runtime models", () => {
   });
 
   test("normalizeGameProgress drops a lastResult whose status is unfinished or missing", () => {
-    const progress = normalizeGameProgress("farm-follies", {
+    const progress = normalizeGameProgress("harvest-hop", {
       lastResult: { status: "active" } as never,
     });
 
@@ -149,7 +149,7 @@ describe("session-runtime models", () => {
   });
 
   test("normalizeGameProgress folds in a finished lastResult, defaulting its summary and duration", () => {
-    const progress = normalizeGameProgress("farm-follies", {
+    const progress = normalizeGameProgress("harvest-hop", {
       lastResult: {
         status: "failed",
         startedAt: "2026-04-22T12:00:00.000Z",
@@ -159,7 +159,7 @@ describe("session-runtime models", () => {
     });
 
     expect(progress.lastResult).toMatchObject({
-      slug: "farm-follies",
+      slug: "harvest-hop",
       status: "failed",
       summary: "Run ended",
       durationMs: 300_000,
@@ -233,7 +233,7 @@ describe("session-runtime models", () => {
   });
 
   test("normalizeGameProgress defaults a finished lastResult's missing startedAt/endedAt to now", () => {
-    const progress = normalizeGameProgress("mega-track", {
+    const progress = normalizeGameProgress("track-day", {
       lastResult: {
         status: "completed",
         score: 1,
@@ -246,7 +246,7 @@ describe("session-runtime models", () => {
   });
 
   test("normalizeGameProgress preserves an explicit durationMs on a finished lastResult instead of recomputing it", () => {
-    const progress = normalizeGameProgress("mega-track", {
+    const progress = normalizeGameProgress("track-day", {
       lastResult: {
         status: "completed",
         startedAt: "2026-04-22T12:00:00.000Z",
@@ -263,7 +263,7 @@ describe("session-runtime models", () => {
 
   test("updateActiveSaveSlot patches fields, re-normalizes the mode, and bumps updatedAt", () => {
     const slot = createActiveSaveSlot({
-      slug: "bioluminescent-sea",
+      slug: "deep-dive",
       mode: "standard",
       now: new Date("2026-04-22T12:00:00.000Z"),
     });
@@ -288,14 +288,14 @@ describe("session-runtime models", () => {
         mode: "standard",
         now: new Date("2026-04-22T12:00:00.000Z"),
         progressSummary: "Landmark 1",
-        slug: "bioluminescent-sea",
+        slug: "deep-dive",
         snapshot: { glow: 18 },
       })
     ).toEqual({
       label: "Resume Standard Run",
       mode: "standard",
       progressSummary: "Landmark 1",
-      slug: "bioluminescent-sea",
+      slug: "deep-dive",
       snapshot: { glow: 18 },
       startedAt: "2026-04-22T12:00:00.000Z",
       status: "active",

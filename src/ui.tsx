@@ -21,15 +21,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { useCabinetRuntime } from "./react.js";
+import { useGameRuntime } from "./react.js";
 import type { GameRunStatus, GameSaveSlot, GameSettings } from "./runtime.js";
 import type { SessionMode } from "./sessionMode.js";
 
-/** Props for {@link CabinetMenuButton}. */
-export interface CabinetMenuButtonProps {
-  /** Called when the button is clicked -- typically opens {@link CabinetPauseMenu}. */
+/** Props for {@link GameMenuButton}. */
+export interface GameMenuButtonProps {
+  /** Called when the button is clicked -- typically opens {@link GamePauseMenu}. */
   onClick: () => void;
-  /** Accessible label and tooltip text. Defaults to `"Open cabinet menu"`. */
+  /** Accessible label and tooltip text. Defaults to `"Open game menu"`. */
   title?: string;
 }
 
@@ -37,19 +37,16 @@ export interface CabinetMenuButtonProps {
  * A fixed-position, top-left pause/menu button. Carries
  * `data-joystick-ignore="true"` so an on-screen virtual joystick never
  * captures pointer events meant for this button -- render it alongside your
- * game canvas and wire `onClick` to open {@link CabinetPauseMenu}.
+ * game canvas and wire `onClick` to open {@link GamePauseMenu}.
  */
-export function CabinetMenuButton({
-  onClick,
-  title = "Open cabinet menu",
-}: CabinetMenuButtonProps) {
+export function GameMenuButton({ onClick, title = "Open game menu" }: GameMenuButtonProps) {
   return (
     <button
       type="button"
       aria-label={title}
       className="fixed left-3 top-3 z-50 grid h-12 w-12 place-items-center rounded-md border border-white/18 bg-black/72 text-white shadow-[0_12px_30px_rgba(0,0,0,0.38)] backdrop-blur transition hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300 sm:left-4 sm:top-4"
       data-joystick-ignore="true"
-      data-testid="cabinet-menu-button"
+      data-testid="game-menu-button"
       title={title}
       onClick={onClick}
     >
@@ -74,7 +71,7 @@ export interface RuntimeResultRecorderProps {
   stats?: Record<string, number | string | boolean>;
   /** Milestone identifiers earned by this run. */
   milestones?: readonly string[];
-  /** localStorage key namespace forwarded to useCabinetRuntime. */
+  /** localStorage key namespace forwarded to useGameRuntime. */
   namespace?: string;
 }
 
@@ -82,7 +79,7 @@ export interface RuntimeResultRecorderProps {
  * Records a {@link GameResult} on mount (and again whenever the props
  * describing the result change) by calling `finishRun` internally, then
  * renders nothing. Drop this into a "game over" screen instead of calling
- * `useCabinetRuntime().finishRun` yourself when you'd rather express the
+ * `useGameRuntime().finishRun` yourself when you'd rather express the
  * result as declarative props.
  *
  * Dedupes by a hash of all its props: re-rendering with the exact same
@@ -100,7 +97,7 @@ export function RuntimeResultRecorder({
   status,
   summary,
 }: RuntimeResultRecorderProps) {
-  const { finishRun } = useCabinetRuntime(slug, { namespace });
+  const { finishRun } = useGameRuntime(slug, { namespace });
   const recordedKey = useRef<string | null>(null);
   const resultKey = useMemo(
     () => JSON.stringify({ milestones, mode, score, slug, stats, status, summary }),
@@ -123,10 +120,12 @@ export function RuntimeResultRecorder({
   return null;
 }
 
-/** Props for {@link CabinetPauseMenu}. */
-export interface CabinetPauseMenuProps {
+/** Props for {@link GamePauseMenu}. */
+export interface GamePauseMenuProps {
   /** Displayed in the header when the main menu view is showing. */
   gameTitle: string;
+  /** Optional small line above the title, e.g. a studio or collection name. Omitted when not given. */
+  eyebrow?: string;
   /** Whether the menu is open. Renders nothing (`null`) when `false`. */
   open: boolean;
   /** Numbered rules shown in the "Rules" sub-view. The "Rules" action is disabled when empty. */
@@ -135,8 +134,8 @@ export interface CabinetPauseMenuProps {
   saveSlot?: GameSaveSlot;
   /** Current settings, passed through to the "Settings" sub-view. */
   settings: GameSettings;
-  /** Called when the "Cabinet" action is clicked (return to the game-select shell). */
-  onCabinet: () => void;
+  /** Called when the "Main Menu" action is clicked (leave the game for the title or game-select screen). */
+  onMainMenu: () => void;
   /** Called when the "Resume" action or the header close button is clicked. */
   onClose: () => void;
   /** Called when the "Quit Run" action is clicked (abandon the current run). */
@@ -149,24 +148,25 @@ export interface CabinetPauseMenuProps {
 
 /**
  * A full-screen pause menu with three views: the main menu (Resume, Restart,
- * Settings, Rules, Cabinet, Quit Run), an embedded {@link CabinetSettingsPanel},
+ * Settings, Rules, Main Menu, Quit Run), an embedded {@link GameSettingsPanel},
  * and a rules list. Purely presentational -- it owns no persistence or
- * routing; wire its `on*` callbacks to {@link useCabinetRuntime}'s
+ * routing; wire its `on*` callbacks to {@link useGameRuntime}'s
  * `abandonRun`/`setSettings`/etc and your own restart/navigation logic.
  * Always resets to the main menu view when reopened.
  */
-export function CabinetPauseMenu({
+export function GamePauseMenu({
   gameTitle,
+  eyebrow,
   open,
   rules = [],
   saveSlot,
   settings,
-  onCabinet,
+  onMainMenu,
   onClose,
   onQuitRun,
   onRestart,
   onSettingsChange,
-}: CabinetPauseMenuProps) {
+}: GamePauseMenuProps) {
   const [view, setView] = useState<"menu" | "settings" | "rules">("menu");
 
   useEffect(() => {
@@ -179,7 +179,7 @@ export function CabinetPauseMenu({
     <div
       className="fixed inset-0 z-[100] grid place-items-center bg-black/64 p-3 text-white backdrop-blur-md sm:p-5"
       data-joystick-ignore="true"
-      data-testid="cabinet-pause-menu"
+      data-testid="game-pause-menu"
       role="dialog"
       aria-modal="true"
       aria-label={`${gameTitle} pause menu`}
@@ -187,9 +187,11 @@ export function CabinetPauseMenu({
       <section className="grid max-h-[92svh] w-[min(94vw,720px)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-white/14 bg-[#111116] shadow-[0_30px_90px_rgba(0,0,0,0.62)]">
         <header className="flex items-center justify-between gap-4 border-b border-white/10 bg-black/44 px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <p className="font-mono text-[0.62rem] font-black uppercase tracking-[0.26em] text-cyan-200/70">
-              Arcade Cabinet
-            </p>
+            {eyebrow ? (
+              <p className="font-mono text-[0.62rem] font-black uppercase tracking-[0.26em] text-cyan-200/70">
+                {eyebrow}
+              </p>
+            ) : null}
             <h2 className="truncate font-display text-2xl font-black uppercase tracking-wide">
               {view === "settings" ? "Settings" : gameTitle}
             </h2>
@@ -206,13 +208,13 @@ export function CabinetPauseMenu({
 
         <div className="min-h-0 overflow-y-auto p-4 sm:p-5">
           {view === "settings" ? (
-            <CabinetSettingsPanel
+            <GameSettingsPanel
               settings={settings}
               onBack={() => setView("menu")}
               onSettingsChange={onSettingsChange}
             />
           ) : view === "rules" ? (
-            <CabinetRulesPanel rules={rules} onBack={() => setView("menu")} />
+            <GameRulesPanel rules={rules} onBack={() => setView("menu")} />
           ) : (
             <div className="grid gap-4">
               {saveSlot ? (
@@ -234,7 +236,7 @@ export function CabinetPauseMenu({
                   label="Rules"
                   onClick={() => setView("rules")}
                 />
-                <PauseAction icon={<Home size={18} />} label="Cabinet" onClick={onCabinet} />
+                <PauseAction icon={<Home size={18} />} label="Main Menu" onClick={onMainMenu} />
                 <PauseAction icon={<ArrowLeft size={18} />} label="Quit Run" onClick={onQuitRun} />
               </div>
             </div>
@@ -245,14 +247,14 @@ export function CabinetPauseMenu({
   );
 }
 
-interface CabinetRulesPanelProps {
+interface GameRulesPanelProps {
   rules: readonly string[];
   onBack: () => void;
 }
 
-function CabinetRulesPanel({ onBack, rules }: CabinetRulesPanelProps) {
+function GameRulesPanel({ onBack, rules }: GameRulesPanelProps) {
   return (
-    <div className="grid gap-4" data-testid="cabinet-rules-panel">
+    <div className="grid gap-4" data-testid="game-rules-panel">
       <button
         type="button"
         className="flex w-fit items-center gap-2 rounded-md border border-white/14 bg-white/8 px-3 py-2 font-mono text-[0.68rem] font-black uppercase tracking-[0.2em] text-white/74 hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-cyan-300"
@@ -278,8 +280,8 @@ function CabinetRulesPanel({ onBack, rules }: CabinetRulesPanelProps) {
   );
 }
 
-/** Props for {@link CabinetSettingsPanel}. */
-export interface CabinetSettingsPanelProps {
+/** Props for {@link GameSettingsPanel}. */
+export interface GameSettingsPanelProps {
   /** Current settings to render controls for. */
   settings: GameSettings;
   /** Called when the "Back" button is clicked. */
@@ -291,21 +293,17 @@ export interface CabinetSettingsPanelProps {
 /**
  * Standalone settings form: toggles for sound/haptics/reduced-motion,
  * segmented controls for graphics quality and handedness, and range sliders
- * for joystick sensitivity and text scale. {@link CabinetPauseMenu} embeds
+ * for joystick sensitivity and text scale. {@link GamePauseMenu} embeds
  * this as its "Settings" sub-view, but it renders and functions the same on
  * its own -- mount it directly for a standalone settings screen.
  */
-export function CabinetSettingsPanel({
-  settings,
-  onBack,
-  onSettingsChange,
-}: CabinetSettingsPanelProps) {
+export function GameSettingsPanel({ settings, onBack, onSettingsChange }: GameSettingsPanelProps) {
   const update = (patch: Partial<GameSettings>) => {
     onSettingsChange((current) => ({ ...current, ...patch }));
   };
 
   return (
-    <div className="grid gap-4" data-testid="cabinet-settings-panel">
+    <div className="grid gap-4" data-testid="game-settings-panel">
       <button
         type="button"
         className="flex w-fit items-center gap-2 rounded-md border border-white/14 bg-white/8 px-3 py-2 font-mono text-[0.68rem] font-black uppercase tracking-[0.2em] text-white/74 hover:bg-white/14 focus:outline-none focus:ring-2 focus:ring-cyan-300"
@@ -375,8 +373,8 @@ export function CabinetSettingsPanel({
   );
 }
 
-/** Props for {@link CabinetErrorBoundary}. */
-export interface CabinetErrorBoundaryProps extends PropsWithChildren {
+/** Props for {@link GameErrorBoundary}. */
+export interface GameErrorBoundaryProps extends PropsWithChildren {
   /**
    * Changing this value clears any caught error and gives `children` a fresh
    * attempt to render -- e.g. set it to the current game's slug so
@@ -384,43 +382,40 @@ export interface CabinetErrorBoundaryProps extends PropsWithChildren {
    * fallback UI.
    */
   boundaryKey?: string;
-  /** Called when the fallback UI's "Return To Cabinet" button is clicked. */
-  onReturnToCabinet?: () => void;
+  /** Called when the fallback UI's "Return To Menu" button is clicked. */
+  onReturnToMenu?: () => void;
 }
 
-interface CabinetErrorBoundaryState {
+interface GameErrorBoundaryState {
   error?: Error;
   boundaryKey?: string;
 }
 
 /**
  * A React error boundary that catches render errors from `children` (e.g. a
- * WebGL boot failure) and shows a "Return To Cabinet" fallback instead of a
+ * WebGL boot failure) and shows a "Return To Menu" fallback instead of a
  * blank crashed page, logging the error via `console.error`. Wrap a game's
- * boot/render tree in this so one cartridge failing to start doesn't take
- * down the whole cabinet shell.
+ * boot/render tree in this so one game failing to start doesn't take down
+ * the app shell around it.
  *
  * The caught error persists across re-renders until `boundaryKey` changes
- * (see {@link CabinetErrorBoundaryProps.boundaryKey}) -- an error boundary
+ * (see {@link GameErrorBoundaryProps.boundaryKey}) -- an error boundary
  * cannot otherwise reset itself once tripped.
  */
-export class CabinetErrorBoundary extends Component<
-  CabinetErrorBoundaryProps,
-  CabinetErrorBoundaryState
-> {
-  state: CabinetErrorBoundaryState = {};
+export class GameErrorBoundary extends Component<GameErrorBoundaryProps, GameErrorBoundaryState> {
+  state: GameErrorBoundaryState = {};
 
-  static getDerivedStateFromError(error: Error): CabinetErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): GameErrorBoundaryState {
     return { error };
   }
 
   static getDerivedStateFromProps(
-    props: CabinetErrorBoundaryProps,
-    state: CabinetErrorBoundaryState
-  ): CabinetErrorBoundaryState | null {
+    props: GameErrorBoundaryProps,
+    state: GameErrorBoundaryState
+  ): GameErrorBoundaryState | null {
     if (state.boundaryKey !== props.boundaryKey) {
       // A changed boundaryKey is the caller asking for a fresh attempt (e.g.
-      // "Return to Cabinet" then relaunch) -- clear the caught error along
+      // "Return To Menu" then relaunch) -- clear the caught error along
       // with the key, or the fallback UI would be stuck forever.
       return { boundaryKey: props.boundaryKey, error: undefined };
     }
@@ -441,18 +436,18 @@ export class CabinetErrorBoundary extends Component<
           <p className="font-mono text-[0.62rem] font-black uppercase tracking-[0.24em] text-rose-200">
             WebGL Boot Fallback
           </p>
-          <h1 className="font-display text-3xl font-black uppercase">Return To Cabinet</h1>
+          <h1 className="font-display text-3xl font-black uppercase">Return To Menu</h1>
           <p className="text-sm leading-relaxed text-slate-200">
-            This cartridge failed to start cleanly. Your local progress is preserved, and the
-            cabinet can continue without reloading the app.
+            This game failed to start cleanly. Your local progress is preserved, and the app can
+            continue without reloading.
           </p>
           <button
             type="button"
             className="inline-flex w-fit items-center gap-2 rounded-md border border-cyan-300/45 bg-cyan-300/12 px-4 py-3 font-mono text-[0.68rem] font-black uppercase tracking-[0.2em] text-cyan-100 hover:bg-cyan-300/18 focus:outline-none focus:ring-2 focus:ring-cyan-300"
-            onClick={this.props.onReturnToCabinet}
+            onClick={this.props.onReturnToMenu}
           >
             <Home size={17} />
-            Return To Cabinet
+            Return To Menu
           </button>
         </section>
       </div>

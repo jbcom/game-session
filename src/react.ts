@@ -27,7 +27,7 @@ import { normalizeSessionMode, type SessionMode } from "./sessionMode.js";
  */
 export const DEFAULT_STORAGE_NAMESPACE = "game-session:v1";
 
-/** Input to {@link finishGameRun} / {@link useCabinetRuntime}'s `finishRun`, describing how a run ended. */
+/** Input to {@link finishGameRun} / {@link useGameRuntime}'s `finishRun`, describing how a run ended. */
 export interface FinishGameRunInput {
   /** The session mode the run was played in. */
   mode: SessionMode;
@@ -45,7 +45,7 @@ export interface FinishGameRunInput {
   now?: Date;
 }
 
-/** Input to {@link abandonGameRun} / {@link useCabinetRuntime}'s `abandonRun`, describing an in-progress run being quit. */
+/** Input to {@link abandonGameRun} / {@link useGameRuntime}'s `abandonRun`, describing an in-progress run being quit. */
 export interface AbandonGameRunInput {
   /** Overrides the mode recorded on the abandoned result. Defaults to the active save slot's mode. */
   mode?: SessionMode;
@@ -61,7 +61,7 @@ export interface AbandonGameRunInput {
   now?: Date;
 }
 
-/** Fields of a {@link GameSaveSlot} that {@link updateGameRun} / `useCabinetRuntime`'s `updateRun` may patch. */
+/** Fields of a {@link GameSaveSlot} that {@link updateGameRun} / `useGameRuntime`'s `updateRun` may patch. */
 export interface UpdateGameRunInput {
   /** New player-facing resume label. */
   label?: string;
@@ -94,7 +94,7 @@ function saveKey(namespace: string, slug: string) {
  * @param namespace - Key prefix. Defaults to {@link DEFAULT_STORAGE_NAMESPACE}.
  * @returns A fully populated `GameSettings`.
  */
-export function readCabinetSettings(
+export function readGameSettings(
   storage = getStorage(),
   namespace: string = DEFAULT_STORAGE_NAMESPACE
 ): GameSettings {
@@ -110,7 +110,7 @@ export function readCabinetSettings(
  * @param storage - Storage backend to write to. Defaults to `window.localStorage`.
  * @param namespace - Key prefix. Defaults to {@link DEFAULT_STORAGE_NAMESPACE}.
  */
-export function writeCabinetSettings(
+export function writeGameSettings(
   settings: GameSettings,
   storage = getStorage(),
   namespace: string = DEFAULT_STORAGE_NAMESPACE
@@ -354,8 +354,8 @@ export function abandonGameRun(
   );
 }
 
-export interface UseCabinetRuntimeOptions {
-  /** localStorage key namespace. Defaults to the shell's original "game-session:v1". */
+export interface UseGameRuntimeOptions {
+  /** localStorage key namespace. Defaults to {@link DEFAULT_STORAGE_NAMESPACE} (`"game-session:v1"`). */
   namespace?: string;
 }
 
@@ -372,7 +372,7 @@ export interface UseCabinetRuntimeOptions {
  * become no-ops (returning `undefined`) until a slug is provided.
  *
  * Note: pause state is *not* part of this hook's state -- see the `./`
- * (root) entry's {@link setCabinetRuntimePaused}/{@link isCabinetRuntimePaused}
+ * (root) entry's {@link setGameRuntimePaused}/{@link isGameRuntimePaused}
  * for the module-level pause flag, which a render loop can read without
  * subscribing to React state.
  *
@@ -382,11 +382,11 @@ export interface UseCabinetRuntimeOptions {
  * @returns `{ settings, progress, saveSlot }` plus `setSettings`, `setProgress`,
  *   `beginRun`, `saveRun`, `updateRun`, `clearRun`, `finishRun`, `abandonRun`.
  */
-export function useCabinetRuntime(slug?: string, options: UseCabinetRuntimeOptions = {}) {
+export function useGameRuntime(slug?: string, options: UseGameRuntimeOptions = {}) {
   const namespace = options.namespace ?? DEFAULT_STORAGE_NAMESPACE;
 
   const [settings, setSettingsState] = useState<GameSettings>(() =>
-    readCabinetSettings(undefined, namespace)
+    readGameSettings(undefined, namespace)
   );
   const [progress, setProgressState] = useState<GameProgress | undefined>(() =>
     slug ? readGameProgress(slug, undefined, namespace) : undefined
@@ -396,7 +396,7 @@ export function useCabinetRuntime(slug?: string, options: UseCabinetRuntimeOptio
   );
 
   useEffect(() => {
-    setSettingsState(readCabinetSettings(undefined, namespace));
+    setSettingsState(readGameSettings(undefined, namespace));
     setProgressState(slug ? readGameProgress(slug, undefined, namespace) : undefined);
     setSaveSlotState(slug ? readGameSaveSlot(slug, undefined, namespace) : undefined);
   }, [slug, namespace]);
@@ -405,7 +405,7 @@ export function useCabinetRuntime(slug?: string, options: UseCabinetRuntimeOptio
     (next: GameSettings | ((current: GameSettings) => GameSettings)) => {
       setSettingsState((current) => {
         const resolved = normalizeGameSettings(typeof next === "function" ? next(current) : next);
-        writeCabinetSettings(resolved, undefined, namespace);
+        writeGameSettings(resolved, undefined, namespace);
         applySettingsToDocument(resolved);
         return resolved;
       });
@@ -507,25 +507,25 @@ export function useCabinetRuntime(slug?: string, options: UseCabinetRuntimeOptio
 /**
  * Push a {@link GameSettings} record onto `document.documentElement` as
  * `data-*` attributes (`reducedMotion`, `graphicsQuality`, `handedness`) and
- * CSS custom properties (`--cabinet-text-scale`, `--cabinet-joystick-sensitivity`),
+ * CSS custom properties (`--game-text-scale`, `--game-joystick-sensitivity`),
  * so plain CSS can react to settings without JS reading them at render time.
- * {@link useCabinetRuntime}'s `setSettings` calls this automatically; call it
+ * {@link useGameRuntime}'s `setSettings` calls this automatically; call it
  * directly only if you manage settings state yourself.
  *
  * A no-op outside a DOM environment (SSR, a worker) rather than throwing.
  *
  * @param settings - The settings to apply. Defaults to the currently persisted settings.
  */
-export function applySettingsToDocument(settings: GameSettings = readCabinetSettings()) {
+export function applySettingsToDocument(settings: GameSettings = readGameSettings()) {
   if (typeof document === "undefined") return;
 
   const normalized = normalizeGameSettings(settings);
   document.documentElement.dataset.reducedMotion = String(normalized.reducedMotion);
   document.documentElement.dataset.graphicsQuality = normalized.graphicsQuality;
   document.documentElement.dataset.handedness = normalized.handedness;
-  document.documentElement.style.setProperty("--cabinet-text-scale", String(normalized.textScale));
+  document.documentElement.style.setProperty("--game-text-scale", String(normalized.textScale));
   document.documentElement.style.setProperty(
-    "--cabinet-joystick-sensitivity",
+    "--game-joystick-sensitivity",
     String(normalized.joystickSensitivity)
   );
 }
