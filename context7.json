@@ -1,0 +1,17 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "game-session",
+  "description": "Session modes, run and progress recording in localStorage, a module-level pause flag, a React hook, and pause-menu and settings UI for browser games.",
+  "branch": "main",
+  "folders": ["docs", "src", "examples"],
+  "excludeFolders": ["node_modules", "dist", "coverage", "docs/dist", "docs/node_modules"],
+  "excludeFiles": ["CHANGELOG.md"],
+  "rules": [
+    "Pass a per-app storage namespace; the default 'game-session:v1' is shared by every app on one origin.",
+    "Every read normalizes untrusted storage data; a corrupted value degrades to defaults and never throws.",
+    "Storage failures (quota, disabled storage, SSR) are swallowed by the read and write functions.",
+    "Pause state is a module-level flag (setGameRuntimePaused), not React state; read it from a render loop with isGameRuntimePaused.",
+    "A GameSaveSlot exists only while a run is active; finishing or abandoning a run clears it and folds a GameResult into GameProgress.",
+    "The ui entry uses Tailwind utility classes and lucide-react icons; the root and react entries have no styling dependency."
+  ]
+}

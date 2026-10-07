@@ -5,20 +5,20 @@ import {
   beginGameRun,
   clearGameSaveSlot,
   finishGameRun,
-  readCabinetSettings,
   readGameProgress,
   readGameSaveSlot,
+  readGameSettings,
   updateGameRun,
-  writeCabinetSettings,
+  writeGameSettings,
 } from "../src/react";
 
-describe("session-runtime browser storage", () => {
+describe("game-session browser storage", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
   test("persists settings locally", () => {
-    writeCabinetSettings({
+    writeGameSettings({
       graphicsQuality: "high",
       handedness: "left",
       hapticsEnabled: false,
@@ -28,7 +28,7 @@ describe("session-runtime browser storage", () => {
       textScale: 1.15,
     });
 
-    expect(readCabinetSettings()).toMatchObject({
+    expect(readGameSettings()).toMatchObject({
       graphicsQuality: "high",
       handedness: "left",
       hapticsEnabled: false,
@@ -38,34 +38,45 @@ describe("session-runtime browser storage", () => {
   });
 
   test("starts and clears one active run per game", () => {
-    beginGameRun("otterly-chaotic", "challenge", {
+    beginGameRun("puzzle-quest", "challenge", {
       progressSummary: "Round 2 rescue",
       snapshot: { saladHealth: 72 },
     });
 
-    expect(readGameProgress("otterly-chaotic")).toMatchObject({
+    expect(readGameProgress("puzzle-quest")).toMatchObject({
       lastSelectedMode: "challenge",
       sessionsStarted: 1,
     });
-    expect(readGameSaveSlot("otterly-chaotic")).toMatchObject({
+    expect(readGameSaveSlot("puzzle-quest")).toMatchObject({
       mode: "challenge",
       progressSummary: "Round 2 rescue",
       snapshot: { saladHealth: 72 },
       status: "active",
     });
 
-    clearGameSaveSlot("otterly-chaotic");
+    clearGameSaveSlot("puzzle-quest");
 
-    expect(readGameSaveSlot("otterly-chaotic")).toBeUndefined();
+    expect(readGameSaveSlot("puzzle-quest")).toBeUndefined();
+  });
+
+  test("uses a caller-supplied label instead of the mode-derived default", () => {
+    beginGameRun("puzzle-quest", "challenge", {
+      label: "Continue Rescue",
+      progressSummary: "Round 2 rescue",
+    });
+
+    expect(readGameSaveSlot("puzzle-quest")).toMatchObject({
+      label: "Continue Rescue",
+    });
   });
 
   test("finishes a run, records progress, and clears stale resume state", () => {
-    beginGameRun("mega-track", "standard", {
+    beginGameRun("track-day", "standard", {
       progressSummary: "Leg 2",
       snapshot: { integrity: 74 },
     });
 
-    const { progress, result } = finishGameRun("mega-track", {
+    const { progress, result } = finishGameRun("track-day", {
       milestones: ["first-cup"],
       mode: "standard",
       now: new Date("2026-04-22T12:12:00.000Z"),
@@ -77,7 +88,7 @@ describe("session-runtime browser storage", () => {
     expect(result).toMatchObject({
       mode: "standard",
       score: 7200,
-      slug: "mega-track",
+      slug: "track-day",
       status: "completed",
       summary: "Cup complete",
     });
@@ -87,15 +98,15 @@ describe("session-runtime browser storage", () => {
       sessionsStarted: 1,
     });
     expect(progress.milestones).toEqual(["first-cup"]);
-    expect(readGameSaveSlot("mega-track")).toBeUndefined();
+    expect(readGameSaveSlot("track-day")).toBeUndefined();
   });
 
   test("updates the active save slot with resumable run details", () => {
-    beginGameRun("overcast-glacier", "standard", {
+    beginGameRun("ice-climb", "standard", {
       progressSummary: "Segment 1",
     });
 
-    const slot = updateGameRun("overcast-glacier", {
+    const slot = updateGameRun("ice-climb", {
       progressSummary: "Segment 3 · 76% warmth",
       snapshot: { segmentIndex: 2, warmth: 76 },
     });
@@ -105,19 +116,19 @@ describe("session-runtime browser storage", () => {
       snapshot: { segmentIndex: 2, warmth: 76 },
       status: "active",
     });
-    expect(readGameSaveSlot("overcast-glacier")).toMatchObject({
+    expect(readGameSaveSlot("ice-climb")).toMatchObject({
       progressSummary: "Segment 3 · 76% warmth",
       snapshot: { segmentIndex: 2, warmth: 76 },
     });
   });
 
   test("abandons an active run from the pause menu and records it as progress", () => {
-    beginGameRun("farm-follies", "cozy", {
+    beginGameRun("harvest-hop", "cozy", {
       progressSummary: "Tier 4 tower",
       snapshot: { height: 18 },
     });
 
-    const result = abandonGameRun("farm-follies", {
+    const result = abandonGameRun("harvest-hop", {
       now: new Date("2026-04-22T12:30:00.000Z"),
       summary: "Quit from pause menu",
     });
@@ -125,7 +136,7 @@ describe("session-runtime browser storage", () => {
     expect(result?.result).toMatchObject({
       mode: "cozy",
       score: 0,
-      slug: "farm-follies",
+      slug: "harvest-hop",
       status: "abandoned",
       summary: "Quit from pause menu",
     });
@@ -133,17 +144,17 @@ describe("session-runtime browser storage", () => {
       sessionsAbandoned: 1,
       sessionsStarted: 1,
     });
-    expect(readGameSaveSlot("farm-follies")).toBeUndefined();
+    expect(readGameSaveSlot("harvest-hop")).toBeUndefined();
   });
 
   test("namespaces storage keys so multiple apps on one origin don't collide", () => {
-    beginGameRun("mega-track", "standard", { progressSummary: "App A" }, undefined, "app-a:v1");
-    beginGameRun("mega-track", "standard", { progressSummary: "App B" }, undefined, "app-b:v1");
+    beginGameRun("track-day", "standard", { progressSummary: "App A" }, undefined, "app-a:v1");
+    beginGameRun("track-day", "standard", { progressSummary: "App B" }, undefined, "app-b:v1");
 
-    expect(readGameSaveSlot("mega-track", undefined, "app-a:v1")).toMatchObject({
+    expect(readGameSaveSlot("track-day", undefined, "app-a:v1")).toMatchObject({
       progressSummary: "App A",
     });
-    expect(readGameSaveSlot("mega-track", undefined, "app-b:v1")).toMatchObject({
+    expect(readGameSaveSlot("track-day", undefined, "app-b:v1")).toMatchObject({
       progressSummary: "App B",
     });
   });

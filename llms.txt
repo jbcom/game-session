@@ -1,0 +1,23 @@
+# game-session
+
+> Session modes (cozy, standard, challenge), run and progress recording in
+> localStorage, a module-level pause flag, a React hook, and pause-menu and
+> settings UI for browser games. Three entry points: `game-session` (pure
+> logic), `game-session/react`, `game-session/ui`.
+
+## Docs
+
+- [Documentation site](https://jbcom.github.io/game-session/): the published,
+  browsable version of everything below.
+- [README](https://github.com/jbcom/game-session/blob/main/README.md): install,
+  quick start, API overview.
+- [API reference](https://github.com/jbcom/game-session/blob/main/docs/API.md):
+  signatures and behavior for every export.
+- [Architecture](https://github.com/jbcom/game-session/blob/main/docs/ARCHITECTURE.md):
+  module boundaries, stored keys, invariants, intentional limits.
+- [Migration](https://github.com/jbcom/game-session/blob/main/docs/MIGRATION.md):
+  the rename mapping from the earlier `Cabinet*` names.
+- [AGENTS.md](https://github.com/jbcom/game-session/blob/main/AGENTS.md):
+  toolchain, invariants not to violate, and doc/test sync obligations.
+- [CONTRIBUTING.md](https://github.com/jbcom/game-session/blob/main/CONTRIBUTING.md):
+  local setup, the `pnpm verify` gate, commit and release conventions.

@@ -1,48 +1,101 @@
 #!/usr/bin/env node
-// Minimal build: tsc emits ESM + .d.ts, esbuild transpiles the same sources to CJS.
-// No bundler — each source module maps 1:1 to a dist module (matches how the
-// package's subpath exports are structured: index/react/ui).
-
+// Dual-format build: tsc emits ESM (+ .d.ts) and CommonJS (+ .d.cts)
+// separately from two tsconfigs, with no bundler. The CommonJS output's .js
+// files are renamed to .cjs so Node resolves them as CommonJS regardless of
+// the package's "type": "module", matching the package.json exports map.
+//
+// The CommonJS build emits its OWN declarations rather than reusing the ESM
+// ones. Pointing a "require" condition at a .d.ts inside a "type": "module"
+// package makes TypeScript read those types as ESM while the runtime file is
+// CommonJS, which arethetypeswrong reports as "Masquerading as ESM".
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import esbuild from "esbuild";
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const srcDir = path.join(root, "src");
-const distDir = path.join(root, "dist");
+const pkgRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const require = createRequire(import.meta.url);
+// TypeScript 7 exports only a fixed set of subpaths, so resolve the package
+// manifest and take its declared `tsc` bin instead of requiring ./bin/tsc.
+const tsManifestPath = require.resolve("typescript/package.json");
+const tscBin = path.join(path.dirname(tsManifestPath), require(tsManifestPath).bin.tsc);
 
-if (existsSync(distDir)) {
-  rmSync(distDir, { recursive: true, force: true });
+function run(args) {
+  // Invoke TypeScript through the active Node executable instead of the
+  // platform-specific node_modules/.bin shim (`tsc` vs `tsc.cmd`).
+  execFileSync(process.execPath, [tscBin, ...args], { cwd: pkgRoot, stdio: "inherit" });
 }
 
-// 1. ESM + type declarations via tsc (respects tsconfig.json in this package).
-execFileSync("pnpm", ["exec", "tsc", "-p", path.join(root, "tsconfig.json")], {
-  cwd: root,
-  stdio: "inherit",
-});
+function walk(dir, visit) {
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      walk(full, visit);
+      continue;
+    }
+    visit(full, entry);
+  }
+}
 
-// 2. CJS via esbuild, one entry point per top-level src module.
-const entryPoints = readdirSync(srcDir)
-  .filter(
-    (file) => /\.(ts|tsx)$/.test(file) && !file.endsWith(".test.ts") && !file.endsWith(".test.tsx")
-  )
-  .map((file) => path.join(srcDir, file));
+// Order matters: .d.ts.map must be tested before .d.ts, and .d.ts before .js,
+// or a shorter suffix claims a file the longer one owns.
+const CJS_RENAMES = [
+  [".d.ts.map", ".d.cts.map"],
+  [".d.ts", ".d.cts"],
+  [".js.map", ".cjs.map"],
+  [".js", ".cjs"],
+];
 
-await esbuild.build({
-  entryPoints,
-  outdir: distDir,
-  outExtension: { ".js": ".cjs" },
-  format: "cjs",
-  platform: "neutral",
-  target: "es2022",
-  bundle: false,
-  sourcemap: false,
-  jsx: "automatic",
-  logLevel: "info",
-});
+function renameForCjs(dir) {
+  walk(dir, (full, entry) => {
+    for (const [from, to] of CJS_RENAMES) {
+      if (entry.endsWith(from)) {
+        renameSync(full, full.slice(0, -from.length) + to);
+        return;
+      }
+    }
+  });
+}
 
-console.log(
-  `Built ${entryPoints.length} entry point(s) -> dist/ (ESM+d.ts via tsc, CJS via esbuild)`
+// tsc writes `require("./foo.js")`, `//# sourceMappingURL=foo.js.map` and
+// `from "./foo.js"` in declarations regardless of the emitted file names;
+// rewrite each to the .cjs/.d.cts names the files now actually have, since
+// Node's CommonJS resolver and tsc both look for the literal extension named.
+function fixCjsSpecifiers(dir) {
+  walk(dir, (full, entry) => {
+    if (entry.endsWith(".d.cts")) {
+      const src = readFileSync(full, "utf8");
+      const fixed = src
+        .replace(/(from\s*|import\s*\()(["'])(\.[^"']+)\.js\2/g, "$1$2$3.cjs$2")
+        .replace(/(\/\/#\s*sourceMappingURL=)(\S+)\.d\.ts\.map/g, "$1$2.d.cts.map");
+      if (fixed !== src) writeFileSync(full, fixed);
+      return;
+    }
+    if (entry.endsWith(".cjs")) {
+      const src = readFileSync(full, "utf8");
+      const fixed = src
+        .replace(/require\((["'])(\.[^"']+)\.js\1\)/g, "require($1$2.cjs$1)")
+        .replace(/(\/\/#\s*sourceMappingURL=)(\S+)\.js\.map/g, "$1$2.cjs.map");
+      if (fixed !== src) writeFileSync(full, fixed);
+    }
+  });
+}
+
+rmSync(path.join(pkgRoot, "dist"), { recursive: true, force: true });
+
+run(["-p", "tsconfig.esm.json"]);
+run(["-p", "tsconfig.cjs.json"]);
+
+const cjsDir = path.join(pkgRoot, "dist", "cjs");
+renameForCjs(cjsDir);
+fixCjsSpecifiers(cjsDir);
+
+// A "type": "module" package makes Node treat a bare .d.ts/.js under dist/cjs
+// as ESM. dist/cjs gets its own manifest so the whole directory is CommonJS.
+writeFileSync(
+  path.join(cjsDir, "package.json"),
+  `${JSON.stringify({ type: "commonjs" }, null, 2)}\n`
 );
+
+console.log("game-session: built dist/esm (ESM+types) and dist/cjs (CommonJS+types)");

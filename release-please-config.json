@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "cc19d6d46b10bd451d8e8e6acb0717ef5232cae0",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "game-session",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true
+    }
+  }
+}

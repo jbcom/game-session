@@ -1,64 +1,156 @@
 {
-  "name": "@arcade-cabinet/session-runtime",
+  "name": "game-session",
   "version": "0.1.0",
-  "description": "Session modes (cozy/standard/challenge), pause-menu + rules/settings UI, and local-storage-backed run/progress recording, extracted from the arcade-cabinet shell.",
+  "description": "Session modes, run and progress recording in localStorage, a module-level pause flag, a React hook, and pause-menu and settings UI for browser games.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "publishConfig": {
-    "access": "restricted"
+    "access": "public",
+    "provenance": true
   },
-  "files": [
-    "dist"
-  ],
+  "sideEffects": false,
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.cts",
+        "default": "./dist/cjs/index.cjs"
+      }
     },
     "./react": {
-      "types": "./dist/react.d.ts",
-      "import": "./dist/react.js",
-      "require": "./dist/react.cjs"
+      "import": {
+        "types": "./dist/esm/react.d.ts",
+        "default": "./dist/esm/react.js"
+      },
+      "require": {
+        "types": "./dist/cjs/react.d.cts",
+        "default": "./dist/cjs/react.cjs"
+      }
     },
     "./ui": {
-      "types": "./dist/ui.d.ts",
-      "import": "./dist/ui.js",
-      "require": "./dist/ui.cjs"
+      "import": {
+        "types": "./dist/esm/ui.d.ts",
+        "default": "./dist/esm/ui.js"
+      },
+      "require": {
+        "types": "./dist/cjs/ui.d.cts",
+        "default": "./dist/cjs/ui.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
+  "typesVersions": {
+    "*": {
+      "react": [
+        "./dist/esm/react.d.ts"
+      ],
+      "ui": [
+        "./dist/esm/ui.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "dist",
+    "docs/API.md",
+    "docs/ARCHITECTURE.md",
+    "examples"
+  ],
   "scripts": {
     "build": "node scripts/build.mjs",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "examples:check": "node examples/basic.mjs && node examples/commonjs.cjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:docs": "markdownlint-cli2 README.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md CHANGELOG.md AGENTS.md \"docs/**/*.md\" \"!docs/node_modules/**\" \"!docs/dist/**\" .github/PULL_REQUEST_TEMPLATE.md",
+    "package:check": "publint && attw --pack . && node scripts/verify-package.mjs",
+    "verify": "pnpm run lint && pnpm run lint:docs && pnpm run typecheck && pnpm run coverage && pnpm run build && pnpm run examples:check && pnpm run package:check",
+    "prepack": "node scripts/build.mjs",
+    "docs:dev": "pnpm --filter game-session-docs dev",
+    "docs:build": "pnpm --filter game-session-docs build",
+    "docs:check": "pnpm --filter game-session-docs check",
+    "prepare": "simple-git-hooks"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "lucide-react": "^0.400.0"
+    "lucide-react": ">=0.400.0 <2.0.0",
+    "react": "^19.0.0"
   },
   "peerDependenciesMeta": {
-    "react": {
+    "lucide-react": {
       "optional": true
     },
-    "lucide-react": {
+    "react": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "@testing-library/dom": "^10.4.1",
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@biomejs/biome": "^2.5.15",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "esbuild": "^0.24.0",
-    "jsdom": "^29.0.2",
-    "lucide-react": "^0.479.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
-  }
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "jsdom": "^30.1.2",
+    "lint-staged": "^17.6.0",
+    "lucide-react": "^1.52.0",
+    "markdownlint-cli2": "^0.23.3",
+    "publint": "^0.3.25",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "simple-git-hooks": "^2.14.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged",
+    "commit-msg": "pnpm exec commitlint --edit $1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ],
+    "*.md": [
+      "markdownlint-cli2"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcom/game-session.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jbcom/game-session/issues"
+  },
+  "homepage": "https://jbcom.github.io/game-session/",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.10.1",
+  "author": "Jon Bogaty <jon@jonbogaty.com>",
+  "keywords": [
+    "game-session",
+    "pause-menu",
+    "local-storage",
+    "save-slot",
+    "game-dev",
+    "browser-games",
+    "react"
+  ]
 }
