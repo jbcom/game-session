@@ -35,9 +35,10 @@ runtime dependencies at all.
 npm install game-session react lucide-react
 ```
 
-Requirements:
+## Compatibility
 
-- Node.js 24 or newer for tooling (CI covers Node 24 and 26); the published
+- Node.js 22, 24 and 26 are supported (`engines.node >=22`, CI covers each
+  maintained line); the published
   output targets ES2022 browsers.
 - React 19 for `/react` and `/ui`; `lucide-react` `>=0.400.0 <2` for `/ui`.
 - Tailwind CSS in the app that renders `/ui`: the components are styled with

@@ -43,7 +43,22 @@ the version the package is tested with. The icons used exist in both the 0.x and
 
 ## 2026-10-07: Toolchain
 
-Node 26 and pnpm 12 to build, TypeScript 7 (native) to compile. `engines.node`
-stays `>=24` with no ceiling and `@types/node` stays on 24, because a library
-must not reach for an API its oldest supported runtime lacks. CI runs Node 24 and
-26 on Linux only: the package touches no paths or processes at runtime.
+Node 26 and pnpm 12 are the development defaults, with TypeScript 7 (native)
+to compile. Node.js 22, 24 and 26 are supported: `engines.node` is `>=22`
+with no ceiling, and CI verifies each maintained line on Linux. This is a
+maintained-line policy, not a promise about every historical patch. The package
+touches no paths or processes at runtime, and no shipped entry point requires
+a later Node API floor. The full verification chain, including packed ESM and
+CommonJS consumers, is checked locally on Node 22 and 26. Development selectors
+remain major-only; scripts and hooks never require an exact Node patch.
+
+## 2026-10-07: branch ruleset policy
+
+`scripts/apply-branch-ruleset.mjs` installs the canonical OSS ruleset trio:
+main integrity, Conventional Commits on other branches, and release tag
+integrity. It defaults to `game-session` and the aggregate CI, title, repository
+policy and dependency review checks. Copilot review and Code Quality rules are
+excluded because they consume AI credits. The script is kept in canonical
+format, outside Biome formatting, so upstream policy changes remain directly
+comparable. Applying it is an explicit repository administration operation;
+verification does not execute it.

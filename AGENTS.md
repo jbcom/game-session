@@ -6,7 +6,8 @@ covers what isn't obvious from reading the code alone.
 ## Toolchain
 
 - Node 26 and pnpm 12 to build (`.nvmrc`, `mise.toml`, `package.json#packageManager`),
-  TypeScript 7 to compile. `engines.node` is `>=24`; do not use an API Node 24 lacks.
+  TypeScript 7 to compile. Supported Node.js lines are 22, 24 and 26;
+  `engines.node` is `>=22`. Do not use an API Node 22 lacks.
 - This is a pnpm workspace with two members: `.` (the published library) and
   `docs/` (the private Sourcey site). Root scripts operate on the library;
   `pnpm docs:*` delegate to `docs/`.
