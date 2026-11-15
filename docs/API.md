@@ -232,3 +232,25 @@ state in the same call. `setSettings` also calls `applySettingsToDocument`.
 | `RuntimeResultRecorder` | `slug`, `mode`, `status`, `score`, `summary?`, `stats?`, `milestones?`, `namespace?`. Records one result per distinct set of props, then renders nothing. |
 
 The components take their handlers as props and own no routing or persistence.
+
+## Async device preferences
+
+`createPreferencesStore({ storage, key, defaults, parse })` loads a typed settings
+record before consumers mount. `storage` supplies asynchronous string `get` and
+`set` methods, including the existing `persistence-save` Preferences KV adapter.
+The package imports no storage backend, React, DOM, renderer or game schema.
+
+The caller's `parse(unknown)` validates, clones and freezes its own settings,
+throwing on invalid input. The same parser checks defaults, stored JSON and
+updates. Failed or corrupt reads retain defaults without writing over storage.
+`snapshot()` returns a stable `{ value, persistence }` object and `subscribe()`
+supports external-store consumers. `set(unknown)` validates before changing
+memory; invalid updates return false and change nothing. Accepted updates are
+immediate and persist in order. Writes are read back before reporting `saved`;
+`failed` retains the accepted in-memory choice and permits a later edit to retry.
+`flush()` waits for queued writes and returns the final write's success. A failed
+observer cannot prevent persistence or notification of other observers. These
+statuses describe storage, not whether a game's input or renderer applied a value.
+
+This additive API leaves the existing synchronous settings and run APIs intact.
+Do not store farm/world snapshots in preferences or persist temporary QA overrides.

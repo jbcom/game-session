@@ -199,3 +199,25 @@ Every export is documented with TSDoc, and the signatures live in the
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+## Async device preferences
+
+`createPreferencesStore({ storage, key, defaults, parse })` loads a typed settings
+record before consumers mount. `storage` supplies asynchronous string `get` and
+`set` methods, including the existing `persistence-save` Preferences KV adapter.
+The package imports no storage backend, React, DOM, renderer or game schema.
+
+The caller's `parse(unknown)` validates, clones and freezes its own settings,
+throwing on invalid input. The same parser checks defaults, stored JSON and
+updates. Failed or corrupt reads retain defaults without writing over storage.
+`snapshot()` returns a stable `{ value, persistence }` object and `subscribe()`
+supports external-store consumers. `set(unknown)` validates before changing
+memory; invalid updates return false and change nothing. Accepted updates are
+immediate and persist in order. Writes are read back before reporting `saved`;
+`failed` retains the accepted in-memory choice and permits a later edit to retry.
+`flush()` waits for queued writes and returns the final write's success. A failed
+observer cannot prevent persistence or notification of other observers. These
+statuses describe storage, not whether a game's input or renderer applied a value.
+
+This additive API leaves the existing synchronous settings and run APIs intact.
+Do not store farm/world snapshots in preferences or persist temporary QA overrides.
