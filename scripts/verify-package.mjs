@@ -35,6 +35,7 @@ const ROOT_FUNCTIONS = [
   "clearGameRuntimePaused",
   "createActiveSaveSlot",
   "createEmptyProgress",
+  "createPreferencesStore",
   "createGameResult",
   "getSessionPressureScale",
   "getSessionRecoveryScale",
@@ -223,6 +224,14 @@ try {
         onMainMenu() {}, onClose() {}, onQuitRun() {}, onRestart() {}, onSettingsChange() {},
       }));
       assert(html.includes("Smoke Game") && html.includes("Main Menu"), "pause menu did not render");
+      const values = new Map();
+      const preferences = await root.createPreferencesStore({
+        storage: { async get(k) { return values.get(k) ?? null; }, async set(k, v) { values.set(k, v); } },
+        key: "device", defaults: { scale: 1 }, parse: (v) => Object.freeze({ scale: v.scale }),
+      });
+      assert.equal(preferences.set({ scale: 0.5 }), true);
+      assert.equal(await preferences.flush(), true);
+      assert.equal(preferences.snapshot().value.scale, 0.5);
       process.stdout.write("ok");
       `,
     ],
