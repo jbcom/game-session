@@ -248,7 +248,8 @@ supports external-store consumers. `set(unknown)` validates before changing
 memory; invalid updates return false and change nothing. Accepted updates are
 immediate and persist in order. Writes are read back before reporting `saved`;
 `failed` retains the accepted in-memory choice and permits a later edit to retry.
-`flush()` waits for queued writes and returns the final write's success. A failed
+`flush()` waits for writes queued before its call and returns the last queued
+write's success; later edits need a later flush. A failed
 observer cannot prevent persistence or notification of other observers. These
 statuses describe storage, not whether a game's input or renderer applied a value.
 

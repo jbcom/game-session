@@ -19,7 +19,7 @@ export interface PreferencesStore<T> {
   subscribe(listener: () => void): () => void;
   /** Validate and apply immediately; false leaves memory and storage untouched. */
   set(value: unknown): boolean;
-  /** Wait for queued writes and their read-backs. False reports a storage failure. */
+  /** Wait for writes queued before this call and their read-backs. False reports a storage failure. */
   flush(): Promise<boolean>;
 }
 
@@ -71,7 +71,7 @@ export async function createPreferencesStore<T>(options: {
     },
     set(candidate) {
       let next: T;
-      let text: string;
+      let text: string | undefined;
       try {
         next = options.parse(candidate);
         text = JSON.stringify(next);
