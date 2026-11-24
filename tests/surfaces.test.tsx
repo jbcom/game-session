@@ -35,6 +35,105 @@ afterEach(() => {
   getDefaultSurfaceStack().dispose();
 });
 
+function OpenerHost({ stack }: { stack: SurfaceStack }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <SurfaceStackProvider stack={stack}>
+      <button type="button" onClick={() => setOpen(true)}>
+        opener
+      </button>
+      <Dialog aria-label="d" open={open} onDismiss={() => setOpen(false)}>
+        <button type="button">first</button>
+        <button type="button">second</button>
+      </Dialog>
+    </SurfaceStackProvider>
+  );
+}
+
+function AutoFocusHost({ stack }: { stack: SurfaceStack }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <SurfaceStackProvider stack={stack}>
+      <button type="button" onClick={() => setOpen(true)}>
+        opener
+      </button>
+      <Dialog aria-label="d" open={open} onDismiss={() => setOpen(false)}>
+        {/* biome-ignore lint/a11y/noAutofocus: proves the opener survives a child's autoFocus */}
+        <button autoFocus type="button">
+          child
+        </button>
+      </Dialog>
+    </SurfaceStackProvider>
+  );
+}
+
+function UnmountHost({ stack, shown }: { stack: SurfaceStack; shown: boolean }) {
+  return (
+    <SurfaceStackProvider stack={stack}>
+      <button type="button">opener</button>
+      {shown ? (
+        <Dialog aria-label="d" open>
+          <button type="button">inside</button>
+        </Dialog>
+      ) : null}
+    </SurfaceStackProvider>
+  );
+}
+
+function ScopedReadout() {
+  const { depth, pausing } = useSurfaceSnapshot();
+  return <output>{`${depth}:${pausing}`}</output>;
+}
+
+function OwnStackReadout({ stack }: { stack: SurfaceStack }) {
+  return <output>{String(useSurfaceSnapshot(stack).depth)}</output>;
+}
+
+function DefaultStackProbe() {
+  const stack = useSurfaceStack();
+  return <output>{String(stack === getDefaultSurfaceStack())}</output>;
+}
+
+function ServerReadout({ stack }: { stack: SurfaceStack }) {
+  return <output>{String(useSurfaceSnapshot(stack).depth)}</output>;
+}
+
+function StrictOpenerHost({ stack }: { stack: SurfaceStack }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <StrictMode>
+      <SurfaceStackProvider stack={stack}>
+        <button type="button" onClick={() => setOpen(true)}>
+          opener
+        </button>
+        <Dialog aria-label="d" open={open} onDismiss={() => setOpen(false)}>
+          <button type="button">inside</button>
+        </Dialog>
+      </SurfaceStackProvider>
+    </StrictMode>
+  );
+}
+
+function NestedHost({ stack }: { stack: SurfaceStack }) {
+  const [outer, setOuter] = useState(false);
+  const [inner, setInner] = useState(false);
+  return (
+    <SurfaceStackProvider stack={stack}>
+      <button type="button" onClick={() => setOuter(true)}>
+        open outer
+      </button>
+      <Surface aria-label="outer" open={outer} placement="fill" onDismiss={() => setOuter(false)}>
+        <button type="button" onClick={() => setInner(true)}>
+          open inner
+        </button>
+      </Surface>
+      <Sheet aria-label="inner" open={inner} onDismiss={() => setInner(false)}>
+        <button type="button">inner control</button>
+      </Sheet>
+    </SurfaceStackProvider>
+  );
+}
+
 describe("Dialog", () => {
   test("renders nothing while closed", () => {
     const { container } = render(<Dialog aria-label="Closed" open={false} />);
@@ -127,21 +226,7 @@ describe("focus", () => {
   test("moves into the surface on open and returns to the opener on close", async () => {
     const user = userEvent.setup();
     const stack = freshStack();
-    function Host() {
-      const [open, setOpen] = useState(false);
-      return (
-        <SurfaceStackProvider stack={stack}>
-          <button type="button" onClick={() => setOpen(true)}>
-            opener
-          </button>
-          <Dialog aria-label="d" open={open} onDismiss={() => setOpen(false)}>
-            <button type="button">first</button>
-            <button type="button">second</button>
-          </Dialog>
-        </SurfaceStackProvider>
-      );
-    }
-    render(<Host />);
+    render(<OpenerHost stack={stack} />);
     const opener = screen.getByRole("button", { name: "opener" });
     await user.click(opener);
     expect(screen.getByRole("button", { name: "first" })).toHaveFocus();
@@ -158,23 +243,7 @@ describe("focus", () => {
   test("remembers the opener even when a child takes focus with autoFocus", async () => {
     const user = userEvent.setup();
     const stack = freshStack();
-    function Host() {
-      const [open, setOpen] = useState(false);
-      return (
-        <SurfaceStackProvider stack={stack}>
-          <button type="button" onClick={() => setOpen(true)}>
-            opener
-          </button>
-          <Dialog aria-label="d" open={open} onDismiss={() => setOpen(false)}>
-            {/* biome-ignore lint/a11y/noAutofocus: proves the opener survives a child's autoFocus */}
-            <button autoFocus type="button">
-              child
-            </button>
-          </Dialog>
-        </SurfaceStackProvider>
-      );
-    }
-    render(<Host />);
+    render(<AutoFocusHost stack={stack} />);
     const opener = screen.getByRole("button", { name: "opener" });
     await user.click(opener);
     expect(screen.getByRole("button", { name: "child" })).toHaveFocus();
@@ -267,23 +336,11 @@ describe("focus", () => {
   test("closing by unmount returns focus too", async () => {
     const user = userEvent.setup();
     const stack = freshStack();
-    function Host({ shown }: { shown: boolean }) {
-      return (
-        <SurfaceStackProvider stack={stack}>
-          <button type="button">opener</button>
-          {shown ? (
-            <Dialog aria-label="d" open>
-              <button type="button">inside</button>
-            </Dialog>
-          ) : null}
-        </SurfaceStackProvider>
-      );
-    }
-    const { rerender } = render(<Host shown={false} />);
+    const { rerender } = render(<UnmountHost stack={stack} shown={false} />);
     await user.click(screen.getByRole("button", { name: "opener" }));
-    rerender(<Host shown />);
+    rerender(<UnmountHost stack={stack} shown />);
     expect(screen.getByRole("button", { name: "inside" })).toHaveFocus();
-    rerender(<Host shown={false} />);
+    rerender(<UnmountHost stack={stack} shown={false} />);
     expect(screen.getByRole("button", { name: "opener" })).toHaveFocus();
   });
 });
@@ -435,13 +492,9 @@ describe("dismissing", () => {
 describe("the pause signal", () => {
   test("useSurfaceSnapshot follows open surfaces, and pauses can be switched off live", () => {
     const stack = freshStack();
-    function Readout() {
-      const { depth, pausing } = useSurfaceSnapshot();
-      return <output>{`${depth}:${pausing}`}</output>;
-    }
     const view = (pauses: boolean) => (
       <SurfaceStackProvider stack={stack}>
-        <Readout />
+        <ScopedReadout />
         <Dialog aria-label="d" open pauses={pauses} />
       </SurfaceStackProvider>
     );
@@ -456,12 +509,9 @@ describe("the pause signal", () => {
   test("a stack passed to the hook or the surface wins over the one in scope", () => {
     const own = freshStack();
     const scoped = freshStack();
-    function Readout() {
-      return <output>{String(useSurfaceSnapshot(own).depth)}</output>;
-    }
     render(
       <SurfaceStackProvider stack={scoped}>
-        <Readout />
+        <OwnStackReadout stack={own} />
         <Dialog aria-label="d" open stack={own} />
       </SurfaceStackProvider>
     );
@@ -471,13 +521,9 @@ describe("the pause signal", () => {
   });
 
   test("without a provider, surfaces join the shared default stack", () => {
-    function Probe() {
-      const stack = useSurfaceStack();
-      return <output>{String(stack === getDefaultSurfaceStack())}</output>;
-    }
     render(
       <>
-        <Probe />
+        <DefaultStackProbe />
         <Dialog aria-label="d" open />
       </>
     );
@@ -487,10 +533,7 @@ describe("the pause signal", () => {
   });
 
   test("the server snapshot is empty", () => {
-    function Readout() {
-      return <output>{String(useSurfaceSnapshot(freshStack()).depth)}</output>;
-    }
-    expect(renderToString(<Readout />)).toContain(">0<");
+    expect(renderToString(<ServerReadout stack={freshStack()} />)).toContain(">0<");
   });
 
   test("an open dialog renders on the server with no effects", () => {
@@ -510,22 +553,7 @@ describe("under StrictMode", () => {
     const stack = freshStack();
     const changes = vi.fn();
     stack.onPausingChange(changes);
-    function Host() {
-      const [open, setOpen] = useState(false);
-      return (
-        <StrictMode>
-          <SurfaceStackProvider stack={stack}>
-            <button type="button" onClick={() => setOpen(true)}>
-              opener
-            </button>
-            <Dialog aria-label="d" open={open} onDismiss={() => setOpen(false)}>
-              <button type="button">inside</button>
-            </Dialog>
-          </SurfaceStackProvider>
-        </StrictMode>
-      );
-    }
-    render(<Host />);
+    render(<StrictOpenerHost stack={stack} />);
     const opener = screen.getByRole("button", { name: "opener" });
     await user.click(opener);
     await act(async () => {
@@ -550,31 +578,7 @@ describe("nesting", () => {
     const stack = freshStack();
     const changes = vi.fn();
     stack.onPausingChange(changes);
-    function Host() {
-      const [outer, setOuter] = useState(false);
-      const [inner, setInner] = useState(false);
-      return (
-        <SurfaceStackProvider stack={stack}>
-          <button type="button" onClick={() => setOuter(true)}>
-            open outer
-          </button>
-          <Surface
-            aria-label="outer"
-            open={outer}
-            placement="fill"
-            onDismiss={() => setOuter(false)}
-          >
-            <button type="button" onClick={() => setInner(true)}>
-              open inner
-            </button>
-          </Surface>
-          <Sheet aria-label="inner" open={inner} onDismiss={() => setInner(false)}>
-            <button type="button">inner control</button>
-          </Sheet>
-        </SurfaceStackProvider>
-      );
-    }
-    render(<Host />);
+    render(<NestedHost stack={stack} />);
     const openOuter = screen.getByRole("button", { name: "open outer" });
     await user.click(openOuter);
     const openInner = screen.getByRole("button", { name: "open inner" });

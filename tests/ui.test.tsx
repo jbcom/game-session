@@ -336,6 +336,15 @@ function fireEventChange(element: HTMLElement, value: string) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function Boom(): never {
+  throw new Error("boom");
+}
+
+function MaybeBoom({ shouldThrow }: { shouldThrow: boolean }) {
+  if (shouldThrow) throw new Error("boom");
+  return <p>Recovered</p>;
+}
+
 describe("GameErrorBoundary", () => {
   test("renders children when there is no error", () => {
     render(
@@ -350,10 +359,6 @@ describe("GameErrorBoundary", () => {
   test("catches a render error and shows the fallback with a return-to-menu action", async () => {
     const onReturnToMenu = vi.fn();
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    function Boom(): never {
-      throw new Error("boom");
-    }
 
     render(
       <GameErrorBoundary onReturnToMenu={onReturnToMenu}>
@@ -372,11 +377,6 @@ describe("GameErrorBoundary", () => {
 
   test("resets its error state when boundaryKey changes", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    function MaybeBoom({ shouldThrow }: { shouldThrow: boolean }) {
-      if (shouldThrow) throw new Error("boom");
-      return <p>Recovered</p>;
-    }
 
     const { rerender } = render(
       <GameErrorBoundary boundaryKey="game-1">
