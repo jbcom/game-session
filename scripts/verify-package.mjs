@@ -22,9 +22,17 @@ const npmNeedsShell = process.platform === "win32";
 // the public one and the user config is emptied so no local token or scoped
 // registry can influence the install. SKIP_INSTALL_SIMPLE_GIT_HOOKS silences the
 // git-hook installer that `prepare` runs during `npm pack`.
+// The scratch installs fetch unpinned react packages, so they also run without
+// install scripts and without the CI publish credentials (the OIDC request
+// variables and the npm auth token) that the publish job holds.
 const npmEnvironment = {
   ...Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !key.toLowerCase().startsWith("npm_config_"))
+    Object.entries(process.env).filter(
+      ([key]) =>
+        !key.toLowerCase().startsWith("npm_config_") &&
+        !key.startsWith("ACTIONS_ID_TOKEN_") &&
+        key !== "NODE_AUTH_TOKEN"
+    )
   ),
   SKIP_INSTALL_SIMPLE_GIT_HOOKS: "1",
   npm_config_registry: "https://registry.npmjs.org/",
@@ -207,6 +215,7 @@ try {
       "install",
       "--no-audit",
       "--no-fund",
+      "--ignore-scripts",
       path.join(workDir, pack.filename),
       "react@19",
       "react-dom@19",
@@ -307,6 +316,7 @@ try {
       "install",
       "--no-audit",
       "--no-fund",
+      "--ignore-scripts",
       path.join(workDir, pack.filename),
       "react@19",
       "react-dom@19",

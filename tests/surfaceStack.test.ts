@@ -82,10 +82,10 @@ describe("snapshot and subscriptions", () => {
     const before = stack.getSnapshot();
     expect(before.pausing).toBe(false);
 
-    handle.update({ pauses: false });
+    handle.update({ onDismiss: undefined, pauses: false });
     expect(stack.getSnapshot()).toBe(before);
 
-    handle.update({});
+    handle.update({ onDismiss: undefined, pauses: true });
     expect(stack.getSnapshot()).toEqual({ depth: 1, pausing: true });
   });
 
@@ -156,6 +156,42 @@ describe("snapshot and subscriptions", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  test("dispose tells a host that was told a pausing surface opened that none is open now", async () => {
+    const listener = vi.fn();
+    stack.onPausingChange(listener);
+    const { container } = surfaceWith("a");
+    stack.register({ container });
+    await Promise.resolve();
+    stack.dispose();
+    await Promise.resolve();
+    expect(listener.mock.calls).toEqual([[true], [false]]);
+  });
+
+  test("dispose says nothing to a host that never heard the surface open", async () => {
+    const listener = vi.fn();
+    stack.onPausingChange(listener);
+    const { container } = surfaceWith("a");
+    stack.register({ container });
+    stack.dispose();
+    await Promise.resolve();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  test("bindSurfacePauseFlag sets the flag at once when a pausing surface is already open", async () => {
+    const { container } = surfaceWith("a");
+    stack.register({ container });
+    const stop = bindSurfacePauseFlag(stack);
+    expect(isGameRuntimePaused()).toBe(true);
+    stop();
+  });
+
+  test("bindSurfacePauseFlag leaves the flag alone when nothing is open", () => {
+    document.documentElement.dataset.gamePaused = "true";
+    const stop = bindSurfacePauseFlag(stack);
+    expect(isGameRuntimePaused()).toBe(true);
+    stop();
+  });
+
   test("bindSurfacePauseFlag mirrors the signal onto the runtime pause flag", async () => {
     const stop = bindSurfacePauseFlag(stack);
     const { container } = surfaceWith("a");
@@ -210,7 +246,7 @@ describe("Escape", () => {
     const stale = vi.fn();
     const live = vi.fn();
     const handle = stack.register({ container, onDismiss: stale });
-    handle.update({ onDismiss: live });
+    handle.update({ onDismiss: live, pauses: true });
     document.activeElement?.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
     );
@@ -231,14 +267,42 @@ describe("Escape", () => {
     window.removeEventListener("keydown", hostListener);
   });
 
-  test("ignores Escape that ends an IME composition", () => {
+  test.each([
+    ["ends an IME composition", { isComposing: true }],
+    ["is reported by Safari after one with keyCode 229", { keyCode: 229 }],
+  ])("an Escape that %s dismisses nothing, but is still kept from the host", (_name, init) => {
+    const host = vi.fn();
+    window.addEventListener("keydown", host);
     const { container } = surfaceWith("a");
     const onDismiss = vi.fn();
     stack.register({ container, onDismiss });
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true })
-    );
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    document.activeElement?.dispatchEvent(event);
     expect(onDismiss).not.toHaveBeenCalled();
+    expect(host).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+    window.removeEventListener("keydown", host);
+  });
+
+  test("holding Escape dismisses one surface, not the stack", () => {
+    const a = surfaceWith("a");
+    const b = surfaceWith("b");
+    const lower = vi.fn();
+    const upper = vi.fn();
+    stack.register({ container: a.container, onDismiss: lower });
+    stack.register({ container: b.container, onDismiss: upper });
+    for (const repeat of [false, true, true]) {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", repeat, bubbles: true, cancelable: true })
+      );
+    }
+    expect(upper).toHaveBeenCalledTimes(1);
+    expect(lower).not.toHaveBeenCalled();
   });
 
   test("ignores keys other than Escape and Tab", () => {
@@ -490,6 +554,112 @@ describe("focus", () => {
     expect(stack.captureOpener()).toBe(trigger);
     trigger.blur();
     expect(stack.captureOpener()).toBeNull();
+  });
+
+  test("closing the outer surface before the one nested in it still returns focus to the outermost opener", () => {
+    const trigger = opener("outermost");
+    const outer = surfaceWith("outer control");
+    const innerContainer = document.createElement("div");
+    const innerButton = document.createElement("button");
+    innerContainer.append(innerButton);
+    outer.container.append(innerContainer);
+    const first = stack.register({ container: outer.container });
+    // The inner surface was opened from the outer one's control.
+    const second = stack.register({ container: innerContainer, opener: outer.buttons[0] });
+    // A parent's effects are cleaned up before its child's, and its DOM goes after.
+    first.release();
+    outer.container.remove();
+    second.release();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  test("a returnFocus that fails for the released surface falls to what it inherited, then to the surface beneath", () => {
+    const trigger = opener("outermost");
+    const a = surfaceWith("a");
+    const b = surfaceWith("b");
+    const c = surfaceWith("c");
+    const first = stack.register({ container: a.container });
+    const second = stack.register({ container: b.container, opener: a.buttons[0] });
+    const third = stack.register({ container: c.container, opener: b.buttons[0] });
+    second.release();
+    first.release();
+    a.container.remove();
+    b.container.remove();
+    third.release();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  test("a child that took focus itself keeps it; a data-autofocus or initialFocus still wins over it", () => {
+    opener();
+    const { container, buttons } = surfaceWith("first", "second");
+    container.tabIndex = -1;
+    buttons[1]?.focus();
+    const handle = stack.register({ container });
+    expect(document.activeElement).toBe(buttons[1]);
+    handle.release();
+
+    container.focus();
+    const onContainer = stack.register({ container });
+    expect(document.activeElement).toBe(buttons[0]);
+    onContainer.release();
+
+    buttons[1]?.focus();
+    buttons[0]?.setAttribute("data-autofocus", "");
+    const marked = stack.register({ container });
+    expect(document.activeElement).toBe(buttons[0]);
+    marked.release();
+  });
+
+  test("tab stops count one radio per group", async () => {
+    const user = userEvent.setup();
+    const container = document.createElement("div");
+    container.innerHTML = `
+      <button id="start">start</button>
+      <input type="radio" name="g" id="r1" />
+      <input type="radio" name="g" id="r2" checked />
+      <input type="radio" name="g" id="r3" />
+      <input type="radio" name="h" id="h1" />
+      <input type="radio" name="h" id="h2" />
+      <form><input type="radio" name="g" id="f1" /><input type="radio" name="g" id="f2" /></form>`;
+    document.body.append(container);
+    stack.register({ container });
+    // Stops: start, r2 (the checked one), h1 (none checked: the first), f1 (its
+    // own form's group). The last is f1, and the one before it h1, not r3 or h2.
+    document.getElementById("f1")?.focus();
+    await user.tab();
+    expect(document.activeElement?.id).toBe("start");
+    await user.tab({ shift: true });
+    expect(document.activeElement?.id).toBe("f1");
+    // A checked radio that follows an unchecked one in its group is its stop.
+    container.innerHTML = `<button id="s">s</button><input type="radio" name="g" id="a" /><input type="radio" name="g" id="b" checked />`;
+    document.getElementById("b")?.focus();
+    await user.tab();
+    expect(document.activeElement?.id).toBe("s");
+  });
+
+  test("an open shadow root inside the surface does not make focus inside it look outside", () => {
+    const container = document.createElement("div");
+    const host = document.createElement("div");
+    container.append(host);
+    document.body.append(container);
+    const shadow = host.attachShadow({ mode: "open" });
+    const inner = document.createElement("button");
+    shadow.append(inner);
+    const outside = opener("outside");
+    stack.register({ container });
+    inner.focus();
+    expect(shadow.activeElement).toBe(inner);
+    expect(document.activeElement).not.toBe(outside);
+  });
+
+  test("two stacks pulling focus back do not recurse without end", () => {
+    const other = createSurfaceStack();
+    const a = surfaceWith("a");
+    const b = surfaceWith("b");
+    stack.register({ container: a.container });
+    other.register({ container: b.container });
+    expect(() => b.buttons[0]?.focus()).not.toThrow();
+    other.dispose();
   });
 
   test("a handle released after dispose does nothing and leaves other surfaces alone", () => {

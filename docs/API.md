@@ -278,7 +278,7 @@ passes a different `side` or `placement`.
 
 `SurfaceDismissReason` is `"escape" | "back" | "backdrop" | "close"`.
 `backdrop` means a press that started and ended on the backdrop; a drag from the
-panel onto it does not count. The host may ignore any reason, for example to
+panel onto it, a drag from it onto the panel and a cancelled touch do not count. The host may ignore any reason, for example to
 close on Escape but not on a backdrop press.
 
 `SurfaceClose` is a `<button type="button">` that calls `onDismiss("close")` on
@@ -317,22 +317,33 @@ with a transform, render nested surfaces beside it instead.
 
 ### Behaviour
 
-- **Focus.** On open, focus moves into the surface. Tab and Shift+Tab wrap
-  inside the top surface; focus moved outside it by a script returns to it.
-  Positive `tabindex` values are not supported.
-- **Escape.** Intercepted in the capture phase on `window`. The top surface's
-  `onDismiss("escape")` is called, `preventDefault` and
-  `stopImmediatePropagation` run, and no later listener sees the key, so a
-  game's "Escape pauses" handler fires only when no surface is open. A surface
-  with no `onDismiss` consumes Escape too. Escape that ends an IME composition
-  is ignored.
+- **Focus.** On open, focus moves into the surface: `initialFocus`, else a
+  `[data-autofocus]` descendant, else a descendant that already took focus (a
+  child with `autoFocus`), else the first tabbable, else the panel. Tab and
+  Shift+Tab wrap inside the top surface; focus moved outside it by a script
+  returns to it. A radio group counts as one stop. Positive `tabindex` values,
+  closed shadow roots and cross-origin iframes are not handled. The panel gets
+  `tabindex="-1"` from the stack after mount if it has none.
+- **Escape.** Intercepted in the capture phase on `window` while a surface is
+  open. `stopImmediatePropagation` runs, so the key reaches no listener
+  registered after the stack's (anything in the bubble phase, on `document` or
+  below, or registered on `window` later), and a game's "Escape pauses" handler
+  fires only when no surface is open. A listener registered earlier on `window`
+  in the capture phase, or on `keyup`, still sees it. The top surface's
+  `onDismiss("escape")` is called, except for a held key's repeats (one press
+  closes one surface) and for an Escape that ends an IME composition
+  (`isComposing`, or the `keyCode` 229 Safari sends), which belongs to the input
+  method. A surface with no `onDismiss` consumes Escape too. A widget inside a
+  surface, such as a combobox, therefore never sees Escape: close it from
+  `onDismiss`.
 - **Back.** See `SurfaceStackOptions.back`. While a surface is open, a back
   press closes the top surface and is always consumed.
 - **Focus return.** On close, focus goes to the opener: `returnFocus` if given,
   else the element focused at the moment of opening (captured during render, so
   a child with `autoFocus` cannot replace it). If that is gone or inert, focus
-  goes to the surface beneath, else it is left alone. Closing by unmounting
-  returns focus the same way.
+  goes to the opener of any surface that was closed from beneath this one (a
+  parent unmounts before its nested child), then to the surface beneath, else
+  it is left alone. Closing by unmounting returns focus the same way.
 - **Pointer lock** is released when the first surface opens, unless the stack
   is created with `releasePointerLock: false`. Held pointers and movement are
   the host's: map the pause signal to clear them.
@@ -382,8 +393,8 @@ returns `false` when no surface is open, so the press is yours.
 
 `register` is the framework-free way to use the stack from any UI: it takes
 `{ container, pauses?, onDismiss?, opener?, returnFocus?, initialFocus? }` and
-returns `{ update({ pauses, onDismiss }), release() }`. The React components are
-a thin layer over it.
+returns `{ update({ pauses, onDismiss }), release() }` (`update` sets both, it
+does not merge). The React components are a thin layer over it.
 
 **The pause signal.** `getSnapshot().pausing` and `onPausingChange` report
 whether a pausing surface is open, for the host to map to its own pause reason:
@@ -401,8 +412,12 @@ is not called with the current value on subscribe: read `getSnapshot()` for that
 function bindSurfacePauseFlag(stack: SurfaceStack): () => void;
 ```
 
-Opt-in: mirrors the signal onto `setGameRuntimePaused`. A host with its own pause
-model does not call it.
+Opt-in: mirrors the signal onto `setGameRuntimePaused`. If a pausing surface is
+already open when it is called the flag is set at once; if none is, the flag is
+left as it is. A host with its own pause model does not call it.
+
+`dispose()` tells a host that heard a pausing surface open that none is open
+now (`onPausingChange(false)`), then forgets every subscriber.
 
 ### React hooks and provider
 

@@ -11,7 +11,7 @@ describe("a surface stack without a DOM", () => {
     expect(typeof document).toBe("undefined");
     const stack = createSurfaceStack();
     const handle = stack.register({ container: {} as HTMLElement });
-    handle.update({ pauses: false });
+    handle.update({ onDismiss: undefined, pauses: false });
     handle.release();
     expect(stack.getSnapshot()).toEqual({ depth: 0, pausing: false });
     expect(stack.dismiss()).toBe(false);

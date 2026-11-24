@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, StrictMode, useState } from "react";
 import { renderToString } from "react-dom/server";
@@ -372,6 +372,26 @@ describe("dismissing", () => {
       { target: backdrop },
       { keys: "[/MouseLeft]" },
     ]);
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // Pressed on the backdrop and released on the panel: the click lands on
+    // their common ancestor, the backdrop, but it is not a backdrop press.
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: backdrop },
+      { target: panel },
+      { keys: "[/MouseLeft]" },
+    ]);
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // A cancelled press (a touch that became a scroll) leaves nothing armed.
+    fireEvent.pointerDown(backdrop);
+    fireEvent.pointerCancel(backdrop);
+    fireEvent.click(backdrop);
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // A press still armed when a click arrives from inside the panel is not a backdrop press.
+    fireEvent.pointerDown(backdrop);
+    fireEvent.click(screen.getByRole("button", { name: "inside" }));
     expect(onDismiss).not.toHaveBeenCalled();
 
     await user.click(backdrop);

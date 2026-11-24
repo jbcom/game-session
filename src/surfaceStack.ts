@@ -52,8 +52,11 @@ export interface SurfaceRegistration {
 
 /** A registered surface. */
 export interface SurfaceHandle {
-  /** Replaces the live `pauses` and `onDismiss` of the registration without re-registering. */
-  update(next: Pick<SurfaceRegistration, "pauses" | "onDismiss">): void;
+  /**
+   * Replaces the live `pauses` and `onDismiss` of the registration without
+   * re-registering. Both are required: this sets them, it does not merge.
+   */
+  update(next: { pauses: boolean; onDismiss: SurfaceRegistration["onDismiss"] }): void;
   /** Removes the surface and returns focus. Safe to call more than once. */
   release(): void;
 }
@@ -107,7 +110,18 @@ interface Entry {
   returnFocus: SurfaceRegistration["returnFocus"];
   initialFocus: SurfaceRegistration["initialFocus"];
   hadTabIndex: boolean;
+  /**
+   * Surfaces released while this one was above them. Their openers are tried
+   * after this one's own, so closing a parent before its nested child (React
+   * unmounts a parent's effects first) still lands focus where the outermost
+   * surface was opened from.
+   */
+  inherited: Entry[];
 }
+
+// Two stacks on one document (or a stack and another focus trap) would each
+// pull focus back from the other without end; one pull at a time breaks that.
+let pullingFocus = false;
 
 const TABBABLE_SELECTOR = [
   "a[href]",
@@ -119,6 +133,7 @@ const TABBABLE_SELECTOR = [
   "summary",
   "audio[controls]",
   "video[controls]",
+  "iframe",
   '[contenteditable]:not([contenteditable="false"])',
   "[tabindex]",
 ].join(",");
@@ -130,8 +145,35 @@ function isTabbable(element: HTMLElement) {
   return element.checkVisibility ? element.checkVisibility({ visibilityProperty: true }) : true;
 }
 
+// A browser tabs to one radio in a group (the checked one, else the first), so
+// the others are not stops: counting them would put a wrap point where Tab
+// never lands.
+function radioStops(items: HTMLElement[]) {
+  // A group is the radios of one form (or of none) that share a name.
+  const groups = new Map<HTMLFormElement | null, Map<string, HTMLInputElement>>();
+  const skipped = new Set<HTMLElement>();
+  for (const item of items) {
+    if (!item.matches('input[type="radio"][name]')) continue;
+    const radio = item as HTMLInputElement;
+    const named = groups.get(radio.form) ?? new Map<string, HTMLInputElement>();
+    groups.set(radio.form, named);
+    const kept = named.get(radio.name);
+    if (!kept) {
+      named.set(radio.name, radio);
+    } else if (radio.checked && !kept.checked) {
+      skipped.add(kept);
+      named.set(radio.name, radio);
+    } else {
+      skipped.add(radio);
+    }
+  }
+  return items.filter((item) => !skipped.has(item));
+}
+
 function tabbablesIn(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR)).filter(isTabbable);
+  return radioStops(
+    Array.from(container.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR)).filter(isTabbable)
+  );
 }
 
 function usable(
@@ -193,13 +235,21 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
   }
 
   function focusInto(entry: Entry) {
+    const { container } = entry;
     const chosen = entry.initialFocus?.();
-    const target = usable(chosen, entry.container)
-      ? chosen
-      : (entry.container.querySelector<HTMLElement>("[data-autofocus]") ??
-        tabbablesIn(entry.container)[0] ??
-        entry.container);
-    target.focus();
+    if (usable(chosen, container)) {
+      chosen.focus();
+      return;
+    }
+    const marked = container.querySelector<HTMLElement>("[data-autofocus]");
+    if (marked) {
+      marked.focus();
+      return;
+    }
+    // A child that took focus itself (React's `autoFocus`) keeps it.
+    const held = container.ownerDocument.activeElement;
+    if (held !== container && container.contains(held)) return;
+    (tabbablesIn(container)[0] ?? container).focus();
   }
 
   function onKeyDown(event: KeyboardEvent) {
@@ -207,10 +257,14 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
     const current = entries[entries.length - 1] as Entry;
 
     if (event.key === "Escape") {
-      if (event.isComposing) return;
-      event.preventDefault();
+      // Always kept from the host. An Escape that ends or cancels an IME
+      // composition (Safari reports it with keyCode 229 after the composition
+      // has ended) belongs to the input method and dismisses nothing; holding
+      // the key dismisses one surface, not the whole stack.
       event.stopImmediatePropagation();
-      current.onDismiss?.("escape");
+      if (event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      if (!event.repeat) current.onDismiss?.("escape");
       return;
     }
 
@@ -238,7 +292,15 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
 
   function onFocusIn(event: FocusEvent) {
     const current = top();
-    if (current && !current.container.contains(event.target as Node)) focusInto(current);
+    // composedPath, not target: inside an open shadow root the target is
+    // retargeted to the host, which is outside the container.
+    if (!current || pullingFocus || event.composedPath().includes(current.container)) return;
+    pullingFocus = true;
+    try {
+      focusInto(current);
+    } finally {
+      pullingFocus = false;
+    }
   }
 
   function attach(target: Document) {
@@ -259,10 +321,14 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
   }
 
   function restoreFocus(released: Entry) {
-    const requested = released.returnFocus?.() ?? released.opener;
-    if (usable(requested)) {
-      requested.focus();
-      return;
+    const queue = [released];
+    for (const entry of queue) {
+      const requested = entry.returnFocus?.() ?? entry.opener;
+      if (usable(requested)) {
+        requested.focus();
+        return;
+      }
+      queue.push(...entry.inherited);
     }
     const below = top();
     if (below) focusInto(below);
@@ -287,6 +353,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
       returnFocus: registration.returnFocus,
       initialFocus: registration.initialFocus,
       hadTabIndex: registration.container.hasAttribute("tabindex"),
+      inherited: [],
     };
     if (!entry.hadTabIndex) entry.container.tabIndex = -1;
 
@@ -304,7 +371,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
     let released = false;
     return {
       update(next) {
-        entry.pauses = next.pauses ?? true;
+        entry.pauses = next.pauses;
         entry.onDismiss = next.onDismiss;
         refresh();
       },
@@ -323,7 +390,13 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
           removeBack = undefined;
         }
         refresh();
-        if (wasTop) restoreFocus(entry);
+        if (wasTop) {
+          restoreFocus(entry);
+        } else {
+          // Released from beneath a surface that is still open: whatever
+          // closes that one next inherits this one's opener.
+          (entries[index] as Entry).inherited.push(entry);
+        }
       },
     };
   }
@@ -355,6 +428,12 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
       removeBack?.();
       removeBack = undefined;
       refresh();
+      // The host was told a pausing surface opened, so tell it none is open
+      // now: the coalesced notification would find no one left to hear it.
+      if (delivered) {
+        delivered = false;
+        for (const listener of [...pausingListeners]) listener(false);
+      }
       listeners.clear();
       pausingListeners.clear();
     },
@@ -364,11 +443,14 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
 /**
  * Mirrors a stack's pausing signal onto the package's module-level pause flag
  * ({@link setGameRuntimePaused}): the flag is set while a pausing surface is
- * open and cleared when the last closes. Opt-in; a host with its own pause
- * model maps {@link SurfaceStack.onPausingChange} itself instead.
+ * open and cleared when the last closes. If a pausing surface is already open
+ * when this is called the flag is set at once; when none is open the flag is
+ * left as it is, since something else may have paused. Opt-in; a host with its
+ * own pause model maps {@link SurfaceStack.onPausingChange} itself instead.
  *
  * @returns A function that stops mirroring.
  */
 export function bindSurfacePauseFlag(stack: SurfaceStack) {
+  if (stack.getSnapshot().pausing) setGameRuntimePaused(true);
   return stack.onPausingChange(setGameRuntimePaused);
 }

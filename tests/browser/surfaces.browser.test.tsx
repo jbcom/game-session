@@ -109,6 +109,40 @@ describe("focus trap", () => {
     expect(back).toEqual(["one", "three", "two", "one", "three"]);
   });
 
+  test("a radio group is one stop, so the wrap points are where Tab really lands", async () => {
+    mount(
+      <Toggle>
+        <button type="button">start</button>
+        <input aria-label="a" name="g" type="radio" />
+        <input aria-label="b" defaultChecked name="g" type="radio" />
+        <input aria-label="c" name="g" type="radio" />
+      </Toggle>
+    );
+    await userEvent.click(byText("opener"));
+    await expect.poll(focused).toBe("start");
+    const label = () => (document.activeElement as HTMLElement).getAttribute("aria-label");
+    await userEvent.keyboard("{Tab}");
+    expect(label()).toBe("b");
+    await userEvent.keyboard("{Tab}");
+    expect(focused()).toBe("start");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(label()).toBe("b");
+  });
+
+  test("a child that takes focus with autoFocus keeps it", async () => {
+    mount(
+      <Toggle>
+        <button type="button">first</button>
+        {/* biome-ignore lint/a11y/noAutofocus: the behaviour under test */}
+        <button autoFocus type="button">
+          chosen
+        </button>
+      </Toggle>
+    );
+    await userEvent.click(byText("opener"));
+    await expect.poll(focused).toBe("chosen");
+  });
+
   test("a dialog with nothing focusable keeps focus on itself", async () => {
     mount(
       <Toggle>

@@ -205,7 +205,7 @@ function OpenSurface({
   placement,
   open: _open,
   onDismiss,
-  pauses,
+  pauses = true,
   role = "dialog",
   initialFocus,
   returnFocus,
@@ -261,13 +261,22 @@ function OpenSurface({
       data-placement={placement}
       data-surface-backdrop=""
       style={{ ...backdropLayout(placement), ...backdropStyle }}
-      onClick={() => {
+      // A backdrop press is one that starts and ends on the backdrop itself: a
+      // drag from the panel onto it, or from it onto the panel, is not one, and
+      // neither is a click an assistive technology sends with no press before it.
+      onClick={(event) => {
         const pressed = pressedBackdrop.current;
         pressedBackdrop.current = false;
-        if (pressed) dismiss("backdrop");
+        if (pressed && event.target === event.currentTarget) dismiss("backdrop");
+      }}
+      onPointerCancel={() => {
+        pressedBackdrop.current = false;
       }}
       onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
         pressedBackdrop.current = event.target === event.currentTarget;
+      }}
+      onPointerUp={(event: PointerEvent<HTMLDivElement>) => {
+        pressedBackdrop.current &&= event.target === event.currentTarget;
       }}
     >
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: role is "dialog" or "alertdialog", both of which support aria-modal; the linter cannot see through the variable */}
