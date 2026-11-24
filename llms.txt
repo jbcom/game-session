@@ -2,8 +2,9 @@
 
 > Session modes (cozy, standard, challenge), run and progress recording in
 > localStorage, a module-level pause flag, a React hook, and pause-menu and
-> settings UI for browser games. Three entry points: `game-session` (pure
-> logic), `game-session/react`, `game-session/ui`.
+> settings UI for browser games. Four entry points: `game-session` (pure
+> logic), `game-session/react`, `game-session/surfaces` (unstyled accessible
+> dialog, drawer and sheet primitives), `game-session/ui`.
 
 ## Docs
 

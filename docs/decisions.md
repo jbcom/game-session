@@ -41,6 +41,31 @@ resolved to the ESM build.
 the version the package is tested with. The icons used exist in both the 0.x and
 1.x lines, and the test suite runs against 1.x.
 
+## 2026-11-23: headless surfaces in their own entry, with a real-browser test project
+
+**Decision.** Dialog, drawer and sheet primitives live in `game-session/surfaces`,
+which needs only `react`, and `game-session/ui` re-exports them. A framework-free
+`SurfaceStack` owns focus, Escape, back and the pause signal; the components only
+register with it. A second Vitest project runs the focus, key and layout tests in
+headless Chromium, and `pnpm verify` runs it.
+
+**Why.** `ui` imports `lucide-react` at module scope and styles with Tailwind, so
+a game with its own look and no lucide cannot import it at all. A separate entry
+fixes that without removing anything from `ui`. State lives in one stack rather
+than per component because nesting is the hard part: only the top surface may
+trap focus or take Escape, and a host maps all of it to one pause reason. jsdom
+has no tab order, does not move focus on a click and lays nothing out, so the
+behaviours that matter are proved in a real engine; the jsdom suite keeps the
+100% coverage gate.
+
+**Considered and not done.** A portal (needs `react-dom`, which is not a
+dependency). `inert` on the page or on the surface beneath (a surface may be
+rendered inside another, and `inert` would disable it). Native `<dialog>`
+(Escape then belongs to the browser's own close handling instead of the stack,
+and a non-dismissible surface must be able to refuse it). Exit
+animations (they need presence state; the host animates entry in CSS and a
+closing surface is removed at once).
+
 ## 2026-10-07: Toolchain
 
 Node 26 and pnpm 12 are the development defaults, with TypeScript 7 (native)

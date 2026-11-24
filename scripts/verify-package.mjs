@@ -80,6 +80,20 @@ const UI_COMPONENTS = [
   "RuntimeResultRecorder",
 ];
 
+const SURFACE_FUNCTIONS = [
+  "Dialog",
+  "Drawer",
+  "Sheet",
+  "Surface",
+  "SurfaceClose",
+  "SurfaceStackProvider",
+  "bindSurfacePauseFlag",
+  "createSurfaceStack",
+  "getDefaultSurfaceStack",
+  "useSurfaceSnapshot",
+  "useSurfaceStack",
+];
+
 function memoryStorage() {
   const map = new Map();
   return {
@@ -89,7 +103,12 @@ function memoryStorage() {
   };
 }
 
-function assertSurface(label, root, react, ui) {
+function assertSurface(label, root, react, ui, surfaces) {
+  for (const name of SURFACE_FUNCTIONS) {
+    assert.equal(typeof surfaces[name], "function", `${label}: surfaces export ${name} is missing`);
+    // `ui` re-exports the same primitives, so a host that already uses it needs no second import.
+    assert.equal(ui[name], surfaces[name], `${label}: ui does not re-export ${name}`);
+  }
   for (const name of ROOT_FUNCTIONS) {
     assert.equal(typeof root[name], "function", `${label}: root export ${name} is missing`);
   }
@@ -156,7 +175,7 @@ try {
     "examples/basic.mjs",
     "examples/commonjs.cjs",
   ];
-  for (const entry of ["index", "react", "ui"]) {
+  for (const entry of ["index", "react", "surfaces", "ui"]) {
     required.push(
       `dist/esm/${entry}.js`,
       `dist/esm/${entry}.d.ts`,
@@ -273,20 +292,83 @@ try {
   );
   assert.equal(cjsSurface, "ok", "installed CommonJS smoke failed");
 
+  // The headless surfaces need only `react`. A host with neither lucide-react
+  // nor Tailwind (so it cannot import `game-session/ui`) must still resolve,
+  // render and run them, under ESM and CommonJS.
+  const leanRoot = path.join(workDir, "lean-consumer");
+  mkdirSync(leanRoot);
+  writeFileSync(
+    path.join(leanRoot, "package.json"),
+    `${JSON.stringify({ private: true, type: "module" })}\n`
+  );
+  execFileSync(
+    npm,
+    [
+      "install",
+      "--no-audit",
+      "--no-fund",
+      path.join(workDir, pack.filename),
+      "react@19",
+      "react-dom@19",
+    ],
+    { cwd: leanRoot, env: npmEnvironment, shell: npmNeedsShell, stdio: "pipe" }
+  );
+  const leanSmoke = (mode) => `
+    ${
+      mode === "esm"
+        ? `import assert from "node:assert/strict";
+           import { createElement } from "react";
+           import { renderToString } from "react-dom/server";
+           import * as surfaces from "game-session/surfaces";`
+        : `const assert = require("node:assert/strict");
+           const { createElement } = require("react");
+           const { renderToString } = require("react-dom/server");
+           const surfaces = require("game-session/surfaces");`
+    }
+    for (const n of ${JSON.stringify(SURFACE_FUNCTIONS)}) assert.equal(typeof surfaces[n], "function", n);
+    const html = renderToString(createElement(surfaces.Dialog, {
+      open: true, "aria-label": "Smoke dialog",
+    }, createElement("p", null, "Smoke content")));
+    assert(html.includes('role="dialog"') && html.includes("Smoke content"), "dialog did not render");
+    const closed = renderToString(createElement(surfaces.Dialog, { open: false, "aria-label": "x" }));
+    assert.equal(closed, "", "a closed dialog rendered markup");
+    const stack = surfaces.createSurfaceStack();
+    assert.deepEqual(stack.getSnapshot(), { depth: 0, pausing: false });
+    process.stdout.write("ok");
+  `;
+  assert.equal(
+    execFileSync(process.execPath, ["--input-type=module", "--eval", leanSmoke("esm")], {
+      cwd: leanRoot,
+      encoding: "utf8",
+    }),
+    "ok",
+    "installed ESM surfaces smoke failed without lucide-react"
+  );
+  assert.equal(
+    execFileSync(process.execPath, ["--input-type=commonjs", "--eval", leanSmoke("cjs")], {
+      cwd: leanRoot,
+      encoding: "utf8",
+    }),
+    "ok",
+    "installed CommonJS surfaces smoke failed without lucide-react"
+  );
+
   // The built-in (workspace) ESM and CommonJS builds must agree on behaviour.
   const esm = {
     root: await import(path.join(packageRoot, "dist/esm/index.js")),
     react: await import(path.join(packageRoot, "dist/esm/react.js")),
+    surfaces: await import(path.join(packageRoot, "dist/esm/surfaces.js")),
     ui: await import(path.join(packageRoot, "dist/esm/ui.js")),
   };
   const require = createRequire(import.meta.url);
   const cjs = {
     root: require(path.join(packageRoot, "dist/cjs/index.cjs")),
     react: require(path.join(packageRoot, "dist/cjs/react.cjs")),
+    surfaces: require(path.join(packageRoot, "dist/cjs/surfaces.cjs")),
     ui: require(path.join(packageRoot, "dist/cjs/ui.cjs")),
   };
-  assertSurface("ESM", esm.root, esm.react, esm.ui);
-  assertSurface("CommonJS", cjs.root, cjs.react, cjs.ui);
+  assertSurface("ESM", esm.root, esm.react, esm.ui, esm.surfaces);
+  assertSurface("CommonJS", cjs.root, cjs.react, cjs.ui, cjs.surfaces);
   assert.deepEqual(
     runLifecycle(esm.react, "challenge"),
     runLifecycle(cjs.react, "challenge"),

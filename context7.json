@@ -12,6 +12,8 @@
     "Storage failures (quota, disabled storage, SSR) are swallowed by the read and write functions.",
     "Pause state is a module-level flag (setGameRuntimePaused), not React state; read it from a render loop with isGameRuntimePaused.",
     "A GameSaveSlot exists only while a run is active; finishing or abandoning a run clears it and folds a GameResult into GameProgress.",
-    "The ui entry uses Tailwind utility classes and lucide-react icons; the root and react entries have no styling dependency."
+    "The ui entry uses Tailwind utility classes and lucide-react icons; the root and react entries have no styling dependency.",
+    "game-session/surfaces is headless and needs only react: Dialog, Drawer, Sheet and Surface render only what the host passes, and one SurfaceStack owns focus, Escape, back and the pause signal.",
+    "A surface with no onDismiss still consumes Escape and back; map stack.onPausingChange to the host's own pause reason."
   ]
 }

@@ -7,13 +7,14 @@ game-session is the small layer a browser game needs around its gameplay: a
 difficulty posture the player picked, somewhere to keep progress between visits,
 and a pause menu that stops the world without losing it.
 
-It is split into three entry points so a game can take one without the others:
+It is split into four entry points so a game can take one without the others:
 
 | Entry point | Contents | Dependencies |
 | --- | --- | --- |
 | `game-session` | Session modes, run results, progress and save-slot shaping, the pause flag | none |
 | `game-session/react` | `localStorage` functions and the `useGameRuntime` hook | `react` |
-| `game-session/ui` | Pause menu, settings panel, error boundary | `react`, `lucide-react`, Tailwind CSS |
+| `game-session/surfaces` | Unstyled dialog, drawer and sheet primitives with a focus trap, Escape and back handling, focus return and a pause signal | `react` |
+| `game-session/ui` | Pause menu, settings panel, error boundary, and the surfaces above | `react`, `lucide-react`, Tailwind CSS |
 
 ## Why use it?
 
