@@ -2,7 +2,6 @@ import {
   type ComponentPropsWithoutRef,
   type CSSProperties,
   createContext,
-  type PointerEvent,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -84,9 +83,6 @@ export type SurfaceProps = SurfaceBaseProps & {
   placement: SurfacePlacement;
 };
 
-/** Props for {@link Dialog}. */
-export type DialogProps = SurfaceBaseProps;
-
 /** Props for {@link Drawer}. */
 export type DrawerProps = SurfaceBaseProps & {
   /** Which edge the drawer is attached to. Defaults to `"right"`. */
@@ -124,7 +120,7 @@ export interface SurfaceStackProviderProps {
  * Supplies the stack for the surfaces below it, for a host that creates its own
  * to pass a back-button source or to read the pausing signal outside React.
  */
-export function SurfaceStackProvider({ stack, children }: SurfaceStackProviderProps) {
+export function SurfaceStackProvider({ stack, children }: Readonly<SurfaceStackProviderProps>) {
   return <StackContext.Provider value={stack}>{children}</StackContext.Provider>;
 }
 
@@ -220,7 +216,7 @@ function OpenSurface({
   const activeStack = stack ?? scoped;
   const panel = useRef<HTMLDivElement>(null);
   const handle = useRef<SurfaceHandle | null>(null);
-  const pressedBackdrop = useRef(false);
+  const backdrop = useRef<HTMLDivElement>(null);
   // What the stack may need after registration reads the latest props through
   // this ref, so a changed callback or `pauses` never closes and reopens the
   // surface.
@@ -255,29 +251,49 @@ function OpenSurface({
     (handle.current as SurfaceHandle).update({ onDismiss: dismiss, pauses });
   }, [dismiss, pauses]);
 
+  // Pressing the backdrop is a pointer convenience, not a control: the keyboard
+  // route to the same end is Escape, handled by the stack. It is wired with
+  // native listeners so the layer is not an interactive element that needs a
+  // role and key handling of its own. A backdrop press is one that starts and
+  // ends on the backdrop itself: a drag from the panel onto it, or from it onto
+  // the panel, is not one, and neither is a click an assistive technology sends
+  // with no press before it.
+  useLayoutEffect(() => {
+    const layer = backdrop.current as HTMLDivElement;
+    let pressed = false;
+    const onDown = (event: Event) => {
+      pressed = event.target === layer;
+    };
+    const onUp = (event: Event) => {
+      pressed &&= event.target === layer;
+    };
+    const onCancel = () => {
+      pressed = false;
+    };
+    const onClick = (event: Event) => {
+      const wasPressed = pressed;
+      pressed = false;
+      if (wasPressed && event.target === layer) dismiss("backdrop");
+    };
+    layer.addEventListener("pointerdown", onDown);
+    layer.addEventListener("pointerup", onUp);
+    layer.addEventListener("pointercancel", onCancel);
+    layer.addEventListener("click", onClick);
+    return () => {
+      layer.removeEventListener("pointerdown", onDown);
+      layer.removeEventListener("pointerup", onUp);
+      layer.removeEventListener("pointercancel", onCancel);
+      layer.removeEventListener("click", onClick);
+    };
+  }, [dismiss]);
+
   return (
     <div
+      ref={backdrop}
       className={backdropClassName}
       data-placement={placement}
       data-surface-backdrop=""
       style={{ ...backdropLayout(placement), ...backdropStyle }}
-      // A backdrop press is one that starts and ends on the backdrop itself: a
-      // drag from the panel onto it, or from it onto the panel, is not one, and
-      // neither is a click an assistive technology sends with no press before it.
-      onClick={(event) => {
-        const pressed = pressedBackdrop.current;
-        pressedBackdrop.current = false;
-        if (pressed && event.target === event.currentTarget) dismiss("backdrop");
-      }}
-      onPointerCancel={() => {
-        pressedBackdrop.current = false;
-      }}
-      onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
-        pressedBackdrop.current = event.target === event.currentTarget;
-      }}
-      onPointerUp={(event: PointerEvent<HTMLDivElement>) => {
-        pressedBackdrop.current &&= event.target === event.currentTarget;
-      }}
     >
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: role is "dialog" or "alertdialog", both of which support aria-modal; the linter cannot see through the variable */}
       <div
@@ -323,7 +339,7 @@ export function Surface(props: SurfaceProps) {
 }
 
 /** A surface centred in the frame, for a choice or confirmation. */
-export function Dialog(props: DialogProps) {
+export function Dialog(props: SurfaceBaseProps) {
   return <SurfaceBase {...props} kind="dialog" placement="center" />;
 }
 
@@ -347,7 +363,7 @@ export type SurfaceCloseProps = Omit<ComponentPropsWithoutRef<"button">, "type">
  * raises `--surface-target` (for example to 64px) to enlarge every target at
  * once. Outside a surface it does nothing.
  */
-export function SurfaceClose({ onClick, style, ...rest }: SurfaceCloseProps) {
+export function SurfaceClose({ onClick, style, ...rest }: Readonly<SurfaceCloseProps>) {
   const dismiss = useContext(DismissContext);
   return (
     <button

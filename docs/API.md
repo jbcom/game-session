@@ -249,7 +249,7 @@ Escape, the back button and the pause signal.
 ### Components
 
 ```tsx
-function Dialog(props: DialogProps): JSX.Element | null;
+function Dialog(props: SurfaceBaseProps): JSX.Element | null; // no placement: always centred
 function Drawer(props: DrawerProps): JSX.Element | null;   // side?: "left" | "right" (default "right")
 function Sheet(props: SheetProps): JSX.Element | null;     // side?: "bottom" | "top" | "left" | "right" (default "bottom")
 function Surface(props: SurfaceProps): JSX.Element | null; // placement: SurfacePlacement

@@ -222,14 +222,14 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
     const pausing = entries.some((entry) => entry.pauses);
     if (snapshot.depth === depth && snapshot.pausing === pausing) return;
     snapshot = { depth, pausing };
-    for (const listener of [...listeners]) listener();
+    for (const listener of listeners) listener();
     if (!flushScheduled) {
       flushScheduled = true;
       queueMicrotask(() => {
         flushScheduled = false;
         if (snapshot.pausing === delivered) return;
         delivered = snapshot.pausing;
-        for (const listener of [...pausingListeners]) listener(delivered);
+        for (const listener of pausingListeners) listener(delivered);
       });
     }
   }
@@ -254,7 +254,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
 
   function onKeyDown(event: KeyboardEvent) {
     // The listener is attached only while a surface is open, so there is a top.
-    const current = entries[entries.length - 1] as Entry;
+    const current = entries.at(-1) as Entry;
 
     if (event.key === "Escape") {
       // Always kept from the host. An Escape that ends or cancels an IME
@@ -419,7 +419,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
       };
     },
     dispose() {
-      for (const entry of [...entries].reverse()) {
+      for (const entry of entries) {
         if (!entry.hadTabIndex) entry.container.removeAttribute("tabindex");
       }
       entries.length = 0;
@@ -432,7 +432,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
       // now: the coalesced notification would find no one left to hear it.
       if (delivered) {
         delivered = false;
-        for (const listener of [...pausingListeners]) listener(false);
+        for (const listener of pausingListeners) listener(false);
       }
       listeners.clear();
       pausingListeners.clear();
