@@ -86,8 +86,9 @@ migrate in place.
   their own menu on the `surfaces` primitives, which have no look at all, or on
   the pure and `react` entries.
 - **Surfaces render in place.** There is no portal, because `react-dom` is not a
-  dependency. Of two surfaces at one z-index the later in the document is on
-  top, and a transformed ancestor re-bases `position: fixed`.
+  dependency. Stacking order comes from the stack (one z-index step per
+  surface), not from the document, and a transformed ancestor re-bases
+  `position: fixed`.
 - **The page behind a surface is not made inert.** A surface may be rendered
   inside another's content, and `inert` on the lower one would disable the upper.
   Keyboard focus is trapped by the stack and `aria-modal` tells assistive

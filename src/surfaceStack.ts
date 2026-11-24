@@ -59,6 +59,13 @@ export interface SurfaceHandle {
   update(next: { pauses: boolean; onDismiss: SurfaceRegistration["onDismiss"] }): void;
   /** Removes the surface and returns focus. Safe to call more than once. */
   release(): void;
+  /**
+   * The surface's place in the stack: 0 for the bottom, `depth - 1` for the
+   * top, -1 once released. A UI layer uses it to paint surfaces in the same
+   * order the stack gives them keyboard focus. It changes only when the
+   * snapshot's `depth` does.
+   */
+  getLayer(): number;
 }
 
 /** A stable view of the stack; a new object is produced only when a field changes. */
@@ -133,7 +140,6 @@ const TABBABLE_SELECTOR = [
   "summary",
   "audio[controls]",
   "video[controls]",
-  "iframe",
   '[contenteditable]:not([contenteditable="false"])',
   "[tabindex]",
 ].join(",");
@@ -234,17 +240,19 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
     }
   }
 
+  // Focus is only given, not taken: a disabled or hidden element ignores
+  // focus(), so a candidate counts only if it is the focused element after.
+  function landed(element: HTMLElement) {
+    element.focus();
+    return element.ownerDocument.activeElement === element;
+  }
+
   function focusInto(entry: Entry) {
     const { container } = entry;
     const chosen = entry.initialFocus?.();
-    if (usable(chosen, container)) {
-      chosen.focus();
-      return;
-    }
-    const marked = container.querySelector<HTMLElement>("[data-autofocus]");
-    if (marked) {
-      marked.focus();
-      return;
+    if (usable(chosen, container) && landed(chosen)) return;
+    for (const marked of container.querySelectorAll<HTMLElement>("[data-autofocus]")) {
+      if (landed(marked)) return;
     }
     // A child that took focus itself (React's `autoFocus`) keeps it.
     const held = container.ownerDocument.activeElement;
@@ -324,10 +332,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
     const queue = [released];
     for (const entry of queue) {
       const requested = entry.returnFocus?.() ?? entry.opener;
-      if (usable(requested)) {
-        requested.focus();
-        return;
-      }
+      if (usable(requested) && landed(requested)) return;
       queue.push(...entry.inherited);
     }
     const below = top();
@@ -343,7 +348,7 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
   }
 
   function register(registration: SurfaceRegistration): SurfaceHandle {
-    if (!doc) return { update() {}, release() {} };
+    if (!doc) return { getLayer: () => 0, update() {}, release() {} };
 
     const entry: Entry = {
       container: registration.container,
@@ -364,12 +369,26 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
         removeBack = options.back.pushBackHandler(() => dismiss("back"));
       }
     }
-    entries.push(entry);
+    // A surface whose container holds an already-open one sits beneath it, so
+    // the stack's order follows the DOM's nesting whichever registers first
+    // (React runs a nested child's effects before its parent's).
+    const above = entries.findIndex((other) => entry.container.contains(other.container));
+    entries.splice(above < 0 ? entries.length : above, 0, entry);
     refresh();
-    focusInto(entry);
+    if (top() === entry) {
+      try {
+        focusInto(entry);
+      } catch (error) {
+        // The caller gets no handle, so nothing would ever release it.
+        remove(entry);
+        refresh();
+        throw error;
+      }
+    }
 
     let released = false;
     return {
+      getLayer: () => entries.indexOf(entry),
       update(next) {
         entry.pauses = next.pauses;
         entry.onDismiss = next.onDismiss;
@@ -381,24 +400,26 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
         if (released || index < 0) return;
         released = true;
         const wasTop = top() === entry;
-        entries.splice(index, 1);
-        if (!entry.hadTabIndex) entry.container.removeAttribute("tabindex");
-        if (entries.length === 0) {
-          detach?.();
-          detach = undefined;
-          removeBack?.();
-          removeBack = undefined;
-        }
+        remove(entry);
+        // Released from beneath a surface that is still open: whatever closes
+        // that one next inherits this one's opener. Recorded before anyone is
+        // notified, because a subscriber may dispose the stack.
+        if (!wasTop) (entries[index] as Entry).inherited.push(entry);
         refresh();
-        if (wasTop) {
-          restoreFocus(entry);
-        } else {
-          // Released from beneath a surface that is still open: whatever
-          // closes that one next inherits this one's opener.
-          (entries[index] as Entry).inherited.push(entry);
-        }
+        if (wasTop) restoreFocus(entry);
       },
     };
+  }
+
+  function remove(entry: Entry) {
+    entries.splice(entries.indexOf(entry), 1);
+    if (!entry.hadTabIndex) entry.container.removeAttribute("tabindex");
+    if (entries.length === 0) {
+      detach?.();
+      detach = undefined;
+      removeBack?.();
+      removeBack = undefined;
+    }
   }
 
   return {
@@ -445,12 +466,21 @@ export function createSurfaceStack(options: SurfaceStackOptions = {}): SurfaceSt
  * ({@link setGameRuntimePaused}): the flag is set while a pausing surface is
  * open and cleared when the last closes. If a pausing surface is already open
  * when this is called the flag is set at once; when none is open the flag is
- * left as it is, since something else may have paused. Opt-in; a host with its
- * own pause model maps {@link SurfaceStack.onPausingChange} itself instead.
+ * left as it is, since something else may have paused. It writes only the
+ * changes it makes itself, synchronously, so a surface that opens and closes in
+ * one task leaves the flag as it found it. Opt-in; a host with its own pause
+ * model maps {@link SurfaceStack.onPausingChange} itself instead.
  *
  * @returns A function that stops mirroring.
  */
 export function bindSurfacePauseFlag(stack: SurfaceStack) {
-  if (stack.getSnapshot().pausing) setGameRuntimePaused(true);
-  return stack.onPausingChange(setGameRuntimePaused);
+  let written = false;
+  const apply = () => {
+    const { pausing } = stack.getSnapshot();
+    if (pausing === written) return;
+    written = pausing;
+    setGameRuntimePaused(pausing);
+  };
+  apply();
+  return stack.subscribe(apply);
 }

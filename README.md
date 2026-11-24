@@ -173,11 +173,16 @@ technology, and the primitives supply what is hard to get right.
 
 ```tsx
 import { createSurfaceStack, Dialog, Sheet, SurfaceClose, SurfaceStackProvider } from "game-session/surfaces";
+// Only for the Android back button; `npm install capacitor-device-profile
+// @capacitor/app @capacitor/core`. The stack itself needs none of them.
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { createAppLifecycle } from "capacitor-device-profile";
 
 // One stack for the page. `back` is anything with pushBackHandler(handler),
-// such as the AppLifecycle that capacitor-device-profile returns.
-const lifecycle = createAppLifecycle({ native: false });
+// such as the AppLifecycle that capacitor-device-profile returns; give it the
+// Capacitor App plugin so native back presses reach it.
+const lifecycle = createAppLifecycle({ app: App, native: Capacitor.isNativePlatform() });
 const surfaces = createSurfaceStack({ back: lifecycle });
 
 // A surface opening or closing is the host's cue to pause or resume.

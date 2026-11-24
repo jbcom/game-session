@@ -14,7 +14,7 @@ covers what isn't obvious from reading the code alone.
 - `pnpm verify` is the single gate CI runs: Biome lint, markdownlint, strict
   TypeScript over `src` and `tests`, the jsdom suite at 100% coverage
   thresholds, the real-browser suite (headless Chromium; run
-  `pnpm exec playwright install chromium` once), the dual-format build, both runnable examples, `publint`, Are The
+  `pnpm exec playwright install --with-deps chromium` once), the dual-format build, both runnable examples, `publint`, Are The
   Types Wrong, and a packed-tarball install into an empty project. A change is
   not done while any part of it is red.
 

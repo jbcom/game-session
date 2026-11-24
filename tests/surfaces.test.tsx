@@ -598,6 +598,84 @@ describe("nesting", () => {
   });
 });
 
+describe("stacking order", () => {
+  test("a nested surface that is open on first render is still the top", async () => {
+    const user = userEvent.setup();
+    const stack = freshStack();
+    const onOuter = vi.fn();
+    const onInner = vi.fn();
+    render(
+      <SurfaceStackProvider stack={stack}>
+        <Dialog aria-label="outer" open onDismiss={onOuter}>
+          <button type="button">outer control</button>
+          <Sheet aria-label="inner" open onDismiss={onInner}>
+            <button type="button">inner control</button>
+          </Sheet>
+        </Dialog>
+      </SurfaceStackProvider>
+    );
+    expect(stack.getSnapshot().depth).toBe(2);
+    expect(screen.getByRole("button", { name: "inner control" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(onInner).toHaveBeenCalledWith("escape");
+    expect(onOuter).not.toHaveBeenCalled();
+  });
+
+  test("surfaces paint in stack order, not document order", () => {
+    const stack = freshStack();
+    const view = (a: boolean) => (
+      <SurfaceStackProvider stack={stack}>
+        <Dialog aria-label="a" data-testid="a" open={a} />
+        <Dialog aria-label="b" data-testid="b" open />
+      </SurfaceStackProvider>
+    );
+    const { rerender } = render(view(false));
+    expect(screen.getByTestId("b").parentElement?.style.zIndex).toBe(
+      "calc(var(--surface-z, 1000) + 0)"
+    );
+    // `a` comes first in the document but opens second, so it is the top.
+    rerender(view(true));
+    expect(screen.getByTestId("a").parentElement?.style.zIndex).toBe(
+      "calc(var(--surface-z, 1000) + 1)"
+    );
+    expect(screen.getByTestId("b").parentElement?.style.zIndex).toBe(
+      "calc(var(--surface-z, 1000) + 0)"
+    );
+  });
+});
+
+describe("a press that ends under the finger", () => {
+  afterEach(() => {
+    delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+  });
+
+  test("is a backdrop press only if what is under the release point is the backdrop", () => {
+    const onDismiss = vi.fn();
+    render(
+      <SurfaceStackProvider stack={freshStack()}>
+        <Dialog aria-label="d" data-testid="panel" open onDismiss={onDismiss} />
+      </SurfaceStackProvider>
+    );
+    const panel = screen.getByTestId("panel");
+    const backdrop = panel.parentElement as HTMLElement;
+    let under: Element = panel;
+    document.elementFromPoint = () => under;
+
+    // A touch started outside the panel and captured there ends over the panel:
+    // its target is still the backdrop, but it is not a backdrop press.
+    fireEvent.pointerDown(backdrop);
+    fireEvent.pointerUp(backdrop);
+    fireEvent.click(backdrop);
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    under = backdrop;
+    fireEvent.pointerDown(backdrop);
+    fireEvent.pointerUp(backdrop);
+    fireEvent.click(backdrop);
+    expect(onDismiss).toHaveBeenCalledExactlyOnceWith("backdrop");
+  });
+});
+
 describe("the ui entry", () => {
   test("re-exports the same primitives", () => {
     expect(ui.Dialog).toBe(Dialog);

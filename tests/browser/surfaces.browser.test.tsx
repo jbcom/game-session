@@ -241,26 +241,76 @@ describe("Escape and focus return", () => {
   });
 });
 
-describe("nesting and the pause signal", () => {
-  function Nested() {
-    const [outer, setOuter] = useState(false);
-    const [inner, setInner] = useState(false);
-    return (
-      <>
-        <button type="button" onClick={() => setOuter(true)}>
-          open outer
+function Nested() {
+  const [outer, setOuter] = useState(false);
+  const [inner, setInner] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOuter(true)}>
+        open outer
+      </button>
+      <Surface aria-label="outer" open={outer} placement="fill" onDismiss={() => setOuter(false)}>
+        <button type="button" onClick={() => setInner(true)}>
+          open inner
         </button>
-        <Surface aria-label="outer" open={outer} placement="fill" onDismiss={() => setOuter(false)}>
-          <button type="button" onClick={() => setInner(true)}>
-            open inner
-          </button>
-        </Surface>
-        <Sheet aria-label="inner" open={inner} onDismiss={() => setInner(false)}>
+      </Surface>
+      <Sheet aria-label="inner" open={inner} onDismiss={() => setInner(false)}>
+        <button type="button">inner control</button>
+      </Sheet>
+    </>
+  );
+}
+
+// Two sibling surfaces, `a` before `b` in the document. `b` is opened first and
+// opens `a`, so `a` is the top of the stack although `b` is later in the markup.
+function Siblings() {
+  const [a, setA] = useState(false);
+  const [b, setB] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setB(true)}>
+        open b
+      </button>
+      <Surface aria-label="a" open={a} placement="fill" onDismiss={() => setA(false)}>
+        <button type="button">control a</button>
+      </Surface>
+      <Surface aria-label="b" open={b} placement="fill" onDismiss={() => setB(false)}>
+        <button type="button" onClick={() => setA(true)}>
+          open a
+        </button>
+      </Surface>
+    </>
+  );
+}
+
+describe("nesting and the pause signal", () => {
+  test("the surface that has keyboard focus is also the one painted on top", async () => {
+    mount(<Siblings />);
+    await userEvent.click(byText("open b"));
+    await userEvent.click(byText("open a"));
+    await expect.poll(focused).toBe("control a");
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    expect(hit?.closest('[role="dialog"]')?.getAttribute("aria-label")).toBe("a");
+  });
+
+  test("a surface nested in another and open on first render takes Escape first", async () => {
+    const onOuter = vi.fn();
+    mount(
+      <Surface aria-label="outer" open placement="fill" onDismiss={onOuter}>
+        <button type="button">outer control</button>
+        <Sheet aria-label="inner" open>
           <button type="button">inner control</button>
         </Sheet>
-      </>
+      </Surface>
     );
-  }
+    await expect.poll(focused).toBe("inner control");
+    await userEvent.keyboard("{Escape}");
+    // The inner sheet has no onDismiss, so it took the key and nothing closed:
+    // the outer surface, beneath it, was never asked.
+    expect(onOuter).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(2);
+    expect(focused()).toBe("inner control");
+  });
 
   test("Escape closes the detail, then the surface, returning focus each time; the host sees one pause", async () => {
     const edges: boolean[] = [];

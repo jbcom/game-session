@@ -192,6 +192,25 @@ describe("snapshot and subscriptions", () => {
     stop();
   });
 
+  test("bindSurfacePauseFlag leaves the flag as it found it when a surface opens and closes in one task", async () => {
+    document.documentElement.dataset.gamePaused = "false";
+    const stop = bindSurfacePauseFlag(stack);
+    const { container } = surfaceWith("a");
+    stack.register({ container }).release();
+    await Promise.resolve();
+    expect(isGameRuntimePaused()).toBe(false);
+    stop();
+  });
+
+  test("bindSurfacePauseFlag clears the flag it set when the stack is disposed", () => {
+    bindSurfacePauseFlag(stack);
+    const { container } = surfaceWith("a");
+    stack.register({ container });
+    expect(isGameRuntimePaused()).toBe(true);
+    stack.dispose();
+    expect(isGameRuntimePaused()).toBe(false);
+  });
+
   test("bindSurfacePauseFlag mirrors the signal onto the runtime pause flag", async () => {
     const stop = bindSurfacePauseFlag(stack);
     const { container } = surfaceWith("a");
@@ -660,6 +679,123 @@ describe("focus", () => {
     other.register({ container: b.container });
     expect(() => b.buttons[0]?.focus()).not.toThrow();
     other.dispose();
+  });
+
+  test("a surface that holds one already open sits beneath it, whichever registers first", () => {
+    opener();
+    const outer = surfaceWith("outer control");
+    const innerContainer = document.createElement("div");
+    const innerButton = document.createElement("button");
+    innerContainer.append(innerButton);
+    outer.container.append(innerContainer);
+    const onOuter = vi.fn();
+    const onInner = vi.fn();
+
+    // A nested child's effects run before its parent's.
+    const inner = stack.register({ container: innerContainer, onDismiss: onInner });
+    const first = stack.register({ container: outer.container, onDismiss: onOuter });
+    expect(inner.getLayer()).toBe(1);
+    expect(first.getLayer()).toBe(0);
+    expect(document.activeElement).toBe(innerButton);
+
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+    );
+    expect(onInner).toHaveBeenCalledWith("escape");
+    expect(onOuter).not.toHaveBeenCalled();
+    expect(stack.getSnapshot().depth).toBe(2);
+    inner.release();
+    expect(first.getLayer()).toBe(0);
+    first.release();
+    expect(first.getLayer()).toBe(-1);
+  });
+
+  test("unrelated surfaces stack in the order they register", () => {
+    const a = surfaceWith("a");
+    const b = surfaceWith("b");
+    const first = stack.register({ container: a.container });
+    const second = stack.register({ container: b.container });
+    expect([first.getLayer(), second.getLayer()]).toEqual([0, 1]);
+  });
+
+  test("an initial focus target that cannot take focus falls through to the next candidate", () => {
+    const trigger = opener();
+    const { container, buttons } = surfaceWith("disabled marked", "second", "third");
+    (buttons[0] as HTMLButtonElement).disabled = true;
+    buttons[0]?.setAttribute("data-autofocus", "");
+    buttons[1]?.setAttribute("data-autofocus", "");
+    const handle = stack.register({ container, initialFocus: () => buttons[0] });
+    expect(document.activeElement).toBe(buttons[1]);
+    handle.release();
+    expect(document.activeElement).toBe(trigger);
+
+    buttons[1]?.removeAttribute("data-autofocus");
+    buttons[0]?.removeAttribute("data-autofocus");
+    const plain = stack.register({ container, initialFocus: () => buttons[0] });
+    expect(document.activeElement).toBe(buttons[1]);
+    plain.release();
+  });
+
+  test("an opener that cannot take focus falls through to the surface beneath", () => {
+    opener();
+    const lower = surfaceWith("lower");
+    const upper = surfaceWith("upper");
+    const first = stack.register({ container: lower.container });
+    const second = stack.register({ container: upper.container, opener: lower.buttons[0] });
+    (lower.buttons[0] as HTMLButtonElement).disabled = true;
+    second.release();
+    expect(document.activeElement).toBe(lower.container);
+    first.release();
+  });
+
+  test("a registration whose initialFocus throws is rolled back completely", () => {
+    const back = backSource();
+    stack.dispose();
+    stack = createSurfaceStack({ back });
+    const host = vi.fn();
+    window.addEventListener("keydown", host);
+    const { container } = surfaceWith("a");
+    expect(() =>
+      stack.register({
+        container,
+        initialFocus: () => {
+          throw new Error("no focus");
+        },
+      })
+    ).toThrow("no focus");
+    expect(stack.getSnapshot().depth).toBe(0);
+    expect(back.handlers).toHaveLength(0);
+    expect(container.hasAttribute("tabindex")).toBe(false);
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(host).toHaveBeenCalledTimes(1);
+    window.removeEventListener("keydown", host);
+  });
+
+  test("a failed nested registration leaves the surface beneath open", () => {
+    const a = surfaceWith("a");
+    const b = surfaceWith("b");
+    stack.register({ container: a.container });
+    expect(() =>
+      stack.register({
+        container: b.container,
+        initialFocus: () => {
+          throw new Error("no focus");
+        },
+      })
+    ).toThrow("no focus");
+    expect(stack.getSnapshot().depth).toBe(1);
+    expect(a.container.tabIndex).toBe(-1);
+  });
+
+  test("a subscriber that disposes the stack as a surface beneath another is released does not break release", () => {
+    const a = surfaceWith("a");
+    const b = surfaceWith("b");
+    const first = stack.register({ container: a.container });
+    stack.register({ container: b.container });
+    stack.subscribe(() => stack.dispose());
+    expect(() => first.release()).not.toThrow();
   });
 
   test("a handle released after dispose does nothing and leaves other surfaces alone", () => {

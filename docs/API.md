@@ -258,11 +258,12 @@ function SurfaceClose(props: SurfaceCloseProps): JSX.Element;
 type SurfacePlacement = "center" | "left" | "right" | "top" | "bottom" | "fill";
 ```
 
-`Dialog` is `Surface` with `placement="center"`, `Drawer` and `Sheet` take an
-edge. The two edge components differ in name and in default edge, not in
-behaviour; use whichever names the role. A surface whose placement changes with
-the viewport (a bottom sheet on a phone, a side panel on a wide window) just
-passes a different `side` or `placement`.
+`Dialog` is `Surface` with `placement="center"`. `Drawer` takes `side` `"left"`
+or `"right"` (default `"right"`); `Sheet` takes `"bottom"`, `"top"`, `"left"` or
+`"right"` (default `"bottom"`). Apart from the sides they accept and the default,
+the two behave alike; use whichever names the role. A surface whose placement
+changes with the viewport (a bottom sheet on a phone, a side panel on a wide
+window) just passes a different `side` or `placement`.
 
 | Prop | Type | Meaning |
 | --- | --- | --- |
@@ -302,7 +303,7 @@ reads a custom property the host can set on any ancestor:
 
 | Property | Default | Use |
 | --- | --- | --- |
-| `--surface-z` | `1000` | `z-index` of the backdrop. Of two surfaces at one z-index the later in the document is on top. |
+| `--surface-z` | `1000` | The base `z-index` of a backdrop. Each surface sits one step above the one beneath it in the stack, so the surface that has keyboard focus is the one painted on top whatever the document order. |
 | `--surface-inset-top`, `-right`, `-bottom`, `-left` | `env(safe-area-inset-*, 0px)` | Padding of the backdrop, so a panel stays clear of a notch or home indicator. |
 | `--surface-target` | `48px` | Minimum width and height of `SurfaceClose`. A host raises it (for example to `64px`) to enlarge every target it builds on the same property. |
 
@@ -310,6 +311,10 @@ Nothing animates by default and no timing is read, so reduced motion is the
 host's CSS: it gives the panel an entrance animation, and removes it under its
 own reduced-motion setting or `prefers-reduced-motion`. A surface that closes is
 removed at once, so there is no exit animation to wait for.
+
+A touch is judged by where it ends, not by the element that captured it, so a
+drag that starts on the backdrop and ends over the panel is not a backdrop
+press.
 
 A surface may be rendered inside another's content. A transformed ancestor makes
 `position: fixed` relative to that ancestor, so when the lower surface animates
@@ -322,7 +327,9 @@ with a transform, render nested surfaces beside it instead.
   child with `autoFocus`), else the first tabbable, else the panel. Tab and
   Shift+Tab wrap inside the top surface; focus moved outside it by a script
   returns to it. A radio group counts as one stop. Positive `tabindex` values,
-  closed shadow roots and cross-origin iframes are not handled. The panel gets
+  closed shadow roots and iframes are not handled (a key pressed inside an
+  iframe is delivered to the iframe's own document, which the stack does not
+  listen to). A disabled or hidden candidate is skipped for the next. The panel gets
   `tabindex="-1"` from the stack after mount if it has none.
 - **Escape.** Intercepted in the capture phase on `window` while a surface is
   open. `stopImmediatePropagation` runs, so the key reaches no listener
@@ -393,8 +400,12 @@ returns `false` when no surface is open, so the press is yours.
 
 `register` is the framework-free way to use the stack from any UI: it takes
 `{ container, pauses?, onDismiss?, opener?, returnFocus?, initialFocus? }` and
-returns `{ update({ pauses, onDismiss }), release() }` (`update` sets both, it
-does not merge). The React components are a thin layer over it.
+returns `{ update({ pauses, onDismiss }), release(), getLayer() }` (`update` sets
+both, it does not merge; `getLayer` is the surface's place in the stack, 0 for
+the bottom, -1 once released). A surface whose container holds one already open
+is placed beneath it, so nesting in the DOM decides order whichever registers
+first. A `register` that throws (an `initialFocus` that throws) is rolled back
+whole. The React components are a thin layer over it.
 
 **The pause signal.** `getSnapshot().pausing` and `onPausingChange` report
 whether a pausing surface is open, for the host to map to its own pause reason:
@@ -414,7 +425,9 @@ function bindSurfacePauseFlag(stack: SurfaceStack): () => void;
 
 Opt-in: mirrors the signal onto `setGameRuntimePaused`. If a pausing surface is
 already open when it is called the flag is set at once; if none is, the flag is
-left as it is. A host with its own pause model does not call it.
+left as it is, and afterwards it writes only the changes it makes itself, in step
+with the stack (not coalesced), so a surface that opens and closes in one task
+leaves the flag as it was. A host with its own pause model does not call it.
 
 `dispose()` tells a host that heard a pausing surface open that none is open
 now (`onPausingChange(false)`), then forgets every subscriber.

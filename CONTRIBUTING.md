@@ -7,7 +7,7 @@ Thanks for taking the time to contribute.
 ```sh
 mise install            # Node 26 and pnpm 12, or use corepack
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium   # once; the browser tests run in headless Chromium
+pnpm exec playwright install --with-deps chromium   # once; the browser tests run in headless Chromium
 pnpm verify             # lint, docs lint, typecheck, coverage, browser tests, build, examples, package checks
 pnpm docs:build         # the Sourcey documentation site
 ```

@@ -167,7 +167,9 @@ const PANEL_LAYOUT: Record<SurfacePlacement, CSSProperties> = {
   fill: { height: "100%", width: "100%" },
 };
 
-function backdropLayout(placement: SurfacePlacement): CSSProperties {
+// Surfaces paint in the order the stack gives them keyboard focus, whatever
+// their order in the document: each is one z-index step above the one beneath.
+function backdropLayout(placement: SurfacePlacement, layer: number): CSSProperties {
   return {
     boxSizing: "border-box",
     display: "flex",
@@ -178,7 +180,7 @@ function backdropLayout(placement: SurfacePlacement): CSSProperties {
     paddingRight: "var(--surface-inset-right, env(safe-area-inset-right, 0px))",
     paddingTop: "var(--surface-inset-top, env(safe-area-inset-top, 0px))",
     position: "fixed",
-    zIndex: "var(--surface-z, 1000)",
+    zIndex: `calc(var(--surface-z, 1000) + ${layer})`,
     ...BACKDROP_LAYOUT[placement],
   };
 }
@@ -226,6 +228,12 @@ function OpenSurface({
   const opener = useRef<HTMLElement | null | undefined>(undefined);
   if (opener.current === undefined) opener.current = activeStack.captureOpener();
 
+  const layer = useSyncExternalStore(
+    activeStack.subscribe,
+    () => handle.current?.getLayer() ?? 0,
+    () => 0
+  );
+
   const dismiss = useCallback((reason: SurfaceDismissReason) => {
     live.current.onDismiss?.(reason);
   }, []);
@@ -265,7 +273,11 @@ function OpenSurface({
       pressed = event.target === layer;
     };
     const onUp = (event: Event) => {
-      pressed &&= event.target === layer;
+      // A touch is captured by the element it started on, so its target says
+      // nothing about where it ended: ask what is under the finger instead.
+      const { clientX, clientY } = event as PointerEvent;
+      const under = layer.ownerDocument.elementFromPoint?.(clientX, clientY) ?? layer;
+      pressed &&= event.target === layer && under === layer;
     };
     const onCancel = () => {
       pressed = false;
@@ -293,7 +305,7 @@ function OpenSurface({
       className={backdropClassName}
       data-placement={placement}
       data-surface-backdrop=""
-      style={{ ...backdropLayout(placement), ...backdropStyle }}
+      style={{ ...backdropLayout(placement, layer), ...backdropStyle }}
     >
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: role is "dialog" or "alertdialog", both of which support aria-modal; the linter cannot see through the variable */}
       <div
