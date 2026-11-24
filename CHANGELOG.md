@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2](https://github.com/jbcom/game-session/compare/v0.3.1...v0.3.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **deps:** override vulnerable transitive docs-toolchain packages ([d801f73](https://github.com/jbcom/game-session/commit/d801f73c255c2790cdaacee0533027fbf93e3f98))
+* **deps:** override vulnerable transitive docs-toolchain packages ([63957f9](https://github.com/jbcom/game-session/commit/63957f9cb555fbc684aa85cfb5c66744516fe72e))
+
 ## [0.3.1](https://github.com/jbcom/game-session/compare/v0.3.0...v0.3.1) (2026-11-24)
 
 
