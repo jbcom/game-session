@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/jbcom/game-session/compare/v0.3.0...v0.3.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **lint:** adopt biome 2.6 and hoist test components to module scope ([e743f6d](https://github.com/jbcom/game-session/commit/e743f6d4e20ee2230ce289985c641afae15732a1))
+
 ## [0.3.0](https://github.com/jbcom/game-session/compare/v0.2.0...v0.3.0) (2026-11-24)
 
 
