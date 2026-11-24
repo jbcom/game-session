@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+# Browser-test failure screenshots written by Vitest.
+.vitest/
 *.tgz
 .DS_Store
 docs/dist/

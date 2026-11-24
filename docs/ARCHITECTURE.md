@@ -8,12 +8,17 @@ description: Module boundaries, stored data, invariants and intentional limits o
 ```text
 game-session            runtime.ts, sessionMode.ts, runtimePause.ts   pure logic, no React
 game-session/react      react.ts                                      storage functions + useGameRuntime
+game-session/surfaces   surfaceStack.ts, surfaces.tsx                 headless dialog, drawer, sheet
 game-session/ui         ui.tsx                                        presentational components
 ```
 
-Dependencies point one way: `ui` uses `react`, `react` uses the root. The root
-entry imports nothing, which is why a game can take only the session modes and
-progress shaping without installing React.
+Dependencies point one way: `ui` uses `react` and `surfaces`, `react` uses the
+root, and `surfaces` uses only `react` and the pause flag. The root entry
+imports nothing, which is why a game can take only the session modes and
+progress shaping without installing React. `surfaces` is its own entry, and `ui`
+re-exports it, because `ui` imports `lucide-react` at module scope: a host
+without that peer cannot import `ui` at all, and the surfaces must still work
+there.
 
 ## Pure functions first
 
@@ -59,6 +64,15 @@ migrate in place.
 6. **Dedup by content.** `RuntimeResultRecorder` records a result once per
    distinct set of props, so a screen that re-renders for unrelated reasons does
    not record the same run twice.
+7. **One stack owns every open surface.** Focus trapping, Escape, the back
+   button and the pause signal live in `createSurfaceStack`, never in a
+   component. Only the top surface acts on a key or a back press. Escape and
+   back are consumed whenever any surface is open, even a non-dismissible one,
+   so neither reaches a handler behind it. The stack is plain DOM and has no
+   React dependency; the components only register with it.
+8. **The surfaces render only what the host passes.** No text, icon or colour
+   is built in, and every structural style reads a CSS custom property. A
+   surface that closes is removed at once; the stack holds no animation state.
 
 ## Intentional limits
 
@@ -67,9 +81,23 @@ migrate in place.
   cross-tab locking; two tabs writing the same slug last-write-wins.
 - **One active run per game.** A second `beginGameRun` for the same slug replaces
   the slot (and still counts as a started session).
-- **No styling system.** The `ui` entry is styled with Tailwind utility classes
-  and ships no CSS. Games with their own design language should build their own
-  menu on the pure and `react` entries.
+- **No styling system.** The menu components in `ui` are styled with Tailwind
+  utility classes and ship no CSS. Games with their own design language build
+  their own menu on the `surfaces` primitives, which have no look at all, or on
+  the pure and `react` entries.
+- **Surfaces render in place.** There is no portal, because `react-dom` is not a
+  dependency. Stacking order comes from the stack (one z-index step per
+  surface), not from the document, and a transformed ancestor re-bases
+  `position: fixed`.
+- **The page behind a surface is not made inert.** A surface may be rendered
+  inside another's content, and `inert` on the lower one would disable the upper.
+  Keyboard focus is trapped by the stack and `aria-modal` tells assistive
+  technology; a host that needs the rest of the page unreachable by pointer
+  relies on the backdrop covering it.
+- **No exit animation and no positive `tabindex`.** A closing surface is removed
+  at once, and tabbing treats every `tabindex` of zero or more as document order.
+- **Browser history is not used.** Back means the back-button source passed to
+  the stack, or the host calling `stack.dismiss()`.
 - **Settings are global to a namespace.** Per-game settings need a per-game
   namespace.
 

@@ -7,8 +7,10 @@ description: Install game-session and record your first run.
 
 ```sh
 npm install game-session
-# only for the /react and /ui entry points:
-npm install react lucide-react
+# only for the /react and /surfaces entry points:
+npm install react
+# /ui also needs lucide-react:
+npm install lucide-react
 ```
 
 ## Record a run without React

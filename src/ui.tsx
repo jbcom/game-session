@@ -25,6 +25,10 @@ import { useGameRuntime } from "./react.js";
 import type { GameRunStatus, GameSaveSlot, GameSettings } from "./runtime.js";
 import type { SessionMode } from "./sessionMode.js";
 
+// The headless dialog, drawer and sheet primitives. They need only React, so a
+// host without lucide-react or Tailwind imports them from `game-session/surfaces`.
+export * from "./surfaces.js";
+
 /** Props for {@link GameMenuButton}. */
 export interface GameMenuButtonProps {
   /** Called when the button is clicked -- typically opens {@link GamePauseMenu}. */

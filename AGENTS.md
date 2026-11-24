@@ -12,8 +12,9 @@ covers what isn't obvious from reading the code alone.
   `docs/` (the private Sourcey site). Root scripts operate on the library;
   `pnpm docs:*` delegate to `docs/`.
 - `pnpm verify` is the single gate CI runs: Biome lint, markdownlint, strict
-  TypeScript over `src` and `tests`, the full test suite at 100% coverage
-  thresholds, the dual-format build, both runnable examples, `publint`, Are The
+  TypeScript over `src` and `tests`, the jsdom suite at 100% coverage
+  thresholds, the real-browser suite (headless Chromium; run
+  `pnpm exec playwright install --with-deps chromium` once), the dual-format build, both runnable examples, `publint`, Are The
   Types Wrong, and a packed-tarball install into an empty project. A change is
   not done while any part of it is red.
 
@@ -26,7 +27,9 @@ Full detail in `docs/ARCHITECTURE.md`.
    `GameResult` folded into `GameProgress`.
 3. The `slug` the caller passes always wins over a slug found inside stored data.
 4. Pause state is a document attribute plus a window event, never React state.
-5. The root entry imports nothing; `react` and `ui` stay separate entry points.
+5. The root entry imports nothing; `react`, `surfaces` and `ui` stay separate
+   entry points. `surfaces` imports only `react` and the pause flag, never
+   `lucide-react`, so it works in a host that cannot import `ui`.
 6. Public names are neutral. Do not put the name of any game, studio or host app
    in code, comments, docs, tests or fixtures; use generic examples such as
    `puzzle-quest`.

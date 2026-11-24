@@ -3,13 +3,14 @@ title: API reference
 description: Every export of game-session, by entry point.
 ---
 
-Three entry points, each importable on its own:
+Four entry points, each importable on its own:
 
 | Entry point | Needs | Contents |
 | --- | --- | --- |
 | `game-session` | nothing | Session modes, run, progress, settings and save-slot shapes, the pause flag |
 | `game-session/react` | `react` | `localStorage`-backed read and write functions, the run lifecycle, `useGameRuntime` |
-| `game-session/ui` | `react`, `lucide-react`, Tailwind CSS | Pause menu, settings panel, menu button, error boundary, result recorder |
+| `game-session/surfaces` | `react` | Unstyled dialog, drawer and sheet primitives and the surface stack behind them |
+| `game-session/ui` | `react`, `lucide-react`, Tailwind CSS | Pause menu, settings panel, menu button, error boundary, result recorder, and everything `game-session/surfaces` exports |
 
 All dates are ISO 8601 strings in stored data. All functions that take a
 `storage` argument default to `window.localStorage` (or `undefined` where there
@@ -232,6 +233,218 @@ state in the same call. `setSettings` also calls `applySettingsToDocument`.
 | `RuntimeResultRecorder` | `slug`, `mode`, `status`, `score`, `summary?`, `stats?`, `milestones?`, `namespace?`. Records one result per distinct set of props, then renders nothing. |
 
 The components take their handlers as props and own no routing or persistence.
+
+`game-session/ui` also re-exports every name in the next section, so a host that
+already imports it needs no second import. A host without `lucide-react` or
+Tailwind imports them from `game-session/surfaces` instead: that entry needs
+only `react`.
+
+## `game-session/surfaces`
+
+Unstyled, accessible layers that cover the page: a centred dialog, an edge
+drawer, an edge sheet, and a full-frame surface. They render only what the host
+passes in (no default text, icon or colour) and share one stack that owns focus,
+Escape, the back button and the pause signal.
+
+### Components
+
+```tsx
+function Dialog(props: SurfaceBaseProps): JSX.Element | null; // no placement: always centred
+function Drawer(props: DrawerProps): JSX.Element | null;   // side?: "left" | "right" (default "right")
+function Sheet(props: SheetProps): JSX.Element | null;     // side?: "bottom" | "top" | "left" | "right" (default "bottom")
+function Surface(props: SurfaceProps): JSX.Element | null; // placement: SurfacePlacement
+function SurfaceClose(props: SurfaceCloseProps): JSX.Element;
+
+type SurfacePlacement = "center" | "left" | "right" | "top" | "bottom" | "fill";
+```
+
+`Dialog` is `Surface` with `placement="center"`. `Drawer` takes `side` `"left"`
+or `"right"` (default `"right"`); `Sheet` takes `"bottom"`, `"top"`, `"left"` or
+`"right"` (default `"bottom"`). Apart from the sides they accept and the default,
+the two behave alike; use whichever names the role. A surface whose placement
+changes with the viewport (a bottom sheet on a phone, a side panel on a wide
+window) just passes a different `side` or `placement`.
+
+| Prop | Type | Meaning |
+| --- | --- | --- |
+| `open` | `boolean` | Shown or not. Closed renders nothing and holds no focus. |
+| `aria-label` or `aria-labelledby` | `string` | Required, one of the two. Names the surface for assistive technology. |
+| `onDismiss` | `(reason: SurfaceDismissReason) => void` | Asked to close. The host sets `open` to `false`. Omit it for a surface that cannot be dismissed. |
+| `pauses` | `boolean` | Whether this surface counts toward the pause signal. Default `true`. |
+| `role` | `"dialog" \| "alertdialog"` | Default `"dialog"`. |
+| `initialFocus` | ref or `() => HTMLElement \| null` | What takes focus on open. Default: a `[data-autofocus]` descendant, then the first tabbable, then the panel. |
+| `returnFocus` | ref or `() => HTMLElement \| null` | Where focus goes on close. Default: what held focus when the surface opened. |
+| `stack` | `SurfaceStack` | The stack to join. Default: the provider's, else the shared default. |
+| `className`, `style`, `backdropClassName`, `backdropStyle`, any `div` attribute | | Pass-through. `style` and `backdropStyle` win over the structural layout. |
+
+`SurfaceDismissReason` is `"escape" | "back" | "backdrop" | "close"`.
+`backdrop` means a press that started and ended on the backdrop; a drag from the
+panel onto it, a drag from it onto the panel and a cancelled touch do not count. The host may ignore any reason, for example to
+close on Escape but not on a backdrop press.
+
+`SurfaceClose` is a `<button type="button">` that calls `onDismiss("close")` on
+the surface around it, unless its own `onClick` calls `preventDefault`. It does
+nothing outside a surface and renders only the children the host passes.
+
+### What a surface renders
+
+```html
+<div data-surface-backdrop data-placement="center">  <!-- fixed, full frame -->
+  <div role="dialog" aria-modal="true" tabindex="-1"
+       data-surface="dialog" data-placement="center"> <!-- the panel -->
+    ...host content...
+  </div>
+</div>
+```
+
+`data-surface` is `dialog`, `drawer`, `sheet` or `surface`. Hosts style through
+these attributes or `className`. The only styles set are structural, and each
+reads a custom property the host can set on any ancestor:
+
+| Property | Default | Use |
+| --- | --- | --- |
+| `--surface-z` | `1000` | The base `z-index` of a backdrop. Each surface sits one step above the one beneath it in the stack, so the surface that has keyboard focus is the one painted on top whatever the document order. |
+| `--surface-inset-top`, `-right`, `-bottom`, `-left` | `env(safe-area-inset-*, 0px)` | Padding of the backdrop, so a panel stays clear of a notch or home indicator. |
+| `--surface-target` | `48px` | Minimum width and height of `SurfaceClose`. A host raises it (for example to `64px`) to enlarge every target it builds on the same property. |
+
+Nothing animates by default and no timing is read, so reduced motion is the
+host's CSS: it gives the panel an entrance animation, and removes it under its
+own reduced-motion setting or `prefers-reduced-motion`. A surface that closes is
+removed at once, so there is no exit animation to wait for.
+
+A touch is judged by where it ends, not by the element that captured it, so a
+drag that starts on the backdrop and ends over the panel is not a backdrop
+press.
+
+A surface may be rendered inside another's content. A transformed ancestor makes
+`position: fixed` relative to that ancestor, so when the lower surface animates
+with a transform, render nested surfaces beside it instead.
+
+### Behaviour
+
+- **Focus.** On open, focus moves into the surface: `initialFocus`, else a
+  `[data-autofocus]` descendant, else a descendant that already took focus (a
+  child with `autoFocus`), else the first tabbable, else the panel. Tab and
+  Shift+Tab wrap inside the top surface; focus moved outside it by a script
+  returns to it. A radio group counts as one stop. Positive `tabindex` values,
+  closed shadow roots and iframes are not handled (a key pressed inside an
+  iframe is delivered to the iframe's own document, which the stack does not
+  listen to). A disabled or hidden candidate is skipped for the next. The panel gets
+  `tabindex="-1"` from the stack after mount if it has none.
+- **Escape.** Intercepted in the capture phase on `window` while a surface is
+  open. `stopImmediatePropagation` runs, so the key reaches no listener
+  registered after the stack's (anything in the bubble phase, on `document` or
+  below, or registered on `window` later), and a game's "Escape pauses" handler
+  fires only when no surface is open. A listener registered earlier on `window`
+  in the capture phase, or on `keyup`, still sees it. The top surface's
+  `onDismiss("escape")` is called, except for a held key's repeats (one press
+  closes one surface) and for an Escape that ends an IME composition
+  (`isComposing`, or the `keyCode` 229 Safari sends), which belongs to the input
+  method. A surface with no `onDismiss` consumes Escape too. A widget inside a
+  surface, such as a combobox, therefore never sees Escape: close it from
+  `onDismiss`.
+- **Back.** See `SurfaceStackOptions.back`. While a surface is open, a back
+  press closes the top surface and is always consumed.
+- **Focus return.** On close, focus goes to the opener: `returnFocus` if given,
+  else the element focused at the moment of opening (captured during render, so
+  a child with `autoFocus` cannot replace it). If that is gone or inert, focus
+  goes to the opener of any surface that was closed from beneath this one (a
+  parent unmounts before its nested child), then to the surface beneath, else
+  it is left alone. Closing by unmounting returns focus the same way.
+- **Pointer lock** is released when the first surface opens, unless the stack
+  is created with `releasePointerLock: false`. Held pointers and movement are
+  the host's: map the pause signal to clear them.
+- **Nesting.** Only the top surface traps focus and takes Escape and back, so
+  Escape closes a detail sheet before the surface beneath it.
+- **React StrictMode.** Registration is idempotent, and the pause signal
+  coalesces a close-and-reopen in one task into no event.
+
+### The stack
+
+```ts
+function createSurfaceStack(options?: SurfaceStackOptions): SurfaceStack;
+
+interface SurfaceStackOptions {
+  document?: Document;               // default: the global document; none means every call is a no-op
+  back?: SurfaceBackSource;          // a back-button source
+  releasePointerLock?: boolean;      // default true
+}
+
+interface SurfaceBackSource {
+  pushBackHandler(handler: () => boolean): () => void;
+}
+
+interface SurfaceStack {
+  register(registration: SurfaceRegistration): SurfaceHandle;
+  captureOpener(): HTMLElement | null;
+  dismiss(reason?: SurfaceDismissReason): boolean;  // default "back"
+  getSnapshot(): SurfaceSnapshot;
+  subscribe(listener: () => void): () => void;
+  onPausingChange(listener: (pausing: boolean) => void): () => void;
+  dispose(): void;
+}
+
+interface SurfaceSnapshot {
+  readonly depth: number;     // surfaces open
+  readonly pausing: boolean;  // any open surface has pauses set
+}
+```
+
+`SurfaceBackSource` is satisfied by the `AppLifecycle` that
+`capacitor-device-profile`'s `createAppLifecycle` returns, so
+`createSurfaceStack({ back: lifecycle })` wires the Android back button with no
+import of that package. While at least one surface is open, one handler is on
+the source's stack; it closes the top surface and returns `true`. Where there
+is no such source, call `stack.dismiss()` from your own back handling; it
+returns `false` when no surface is open, so the press is yours.
+
+`register` is the framework-free way to use the stack from any UI: it takes
+`{ container, pauses?, onDismiss?, opener?, returnFocus?, initialFocus? }` and
+returns `{ update({ pauses, onDismiss }), release(), getLayer() }` (`update` sets
+both, it does not merge; `getLayer` is the surface's place in the stack, 0 for
+the bottom, -1 once released). A surface whose container holds one already open
+is placed beneath it, so nesting in the DOM decides order whichever registers
+first. A `register` that throws (an `initialFocus` that throws) is rolled back
+whole. The React components are a thin layer over it.
+
+**The pause signal.** `getSnapshot().pausing` and `onPausingChange` report
+whether a pausing surface is open, for the host to map to its own pause reason:
+
+```ts
+const stack = createSurfaceStack({ back: lifecycle });
+stack.onPausingChange((pausing) => setPauseReason("surface", pausing));
+```
+
+`onPausingChange` fires once when the first pausing surface opens and once when
+the last closes (nested surfaces add nothing), is delivered in a microtask, and
+is not called with the current value on subscribe: read `getSnapshot()` for that.
+
+```ts
+function bindSurfacePauseFlag(stack: SurfaceStack): () => void;
+```
+
+Opt-in: mirrors the signal onto `setGameRuntimePaused`. If a pausing surface is
+already open when it is called the flag is set at once; if none is, the flag is
+left as it is, and afterwards it writes only the changes it makes itself, in step
+with the stack (not coalesced), so a surface that opens and closes in one task
+leaves the flag as it was. A host with its own pause model does not call it.
+
+`dispose()` tells a host that heard a pausing surface open that none is open
+now (`onPausingChange(false)`), then forgets every subscriber.
+
+### React hooks and provider
+
+```tsx
+function SurfaceStackProvider(props: { stack: SurfaceStack; children?: ReactNode }): JSX.Element;
+function useSurfaceStack(): SurfaceStack;            // the provider's, else the shared default
+function useSurfaceSnapshot(stack?: SurfaceStack): SurfaceSnapshot;
+function getDefaultSurfaceStack(): SurfaceStack;     // created on first use
+```
+
+Without a provider every surface joins the shared default stack, which is enough
+for a game with one document. Create your own with `createSurfaceStack` to pass
+a back source or to read the signal outside React. `useSurfaceSnapshot`
+re-renders on any change and returns an empty snapshot on the server.
 
 ## Async device preferences
 

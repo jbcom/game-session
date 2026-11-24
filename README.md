@@ -16,8 +16,11 @@ those three things, split so you can take one without the others.
   normalization, and a pause flag. No React, no DOM required.
 - **`game-session/react`**: a `useGameRuntime` hook plus plain functions over
   `localStorage`.
+- **`game-session/surfaces`**: unstyled, accessible dialog, drawer and sheet
+  primitives with a focus trap, Escape and back handling, focus return, and a
+  pause signal. Needs only `react`.
 - **`game-session/ui`**: a presentational pause menu, settings panel, and error
-  boundary.
+  boundary. It also re-exports everything in `game-session/surfaces`.
 
 Full documentation: **[jbcom.github.io/game-session](https://jbcom.github.io/game-session/)**
 
@@ -28,8 +31,8 @@ npm install game-session
 ```
 
 `react` and `lucide-react` are **optional** peer dependencies. You only need
-them if you import the `/react` or `/ui` subpaths; the core entry point has no
-runtime dependencies at all.
+`react` if you import the `/react` or `/surfaces` subpaths, and `lucide-react`
+too for `/ui`; the core entry point has no runtime dependencies at all.
 
 ```sh
 npm install game-session react lucide-react
@@ -40,7 +43,8 @@ npm install game-session react lucide-react
 - Node.js 22, 24 and 26 are supported (`engines.node >=22`, CI covers each
   maintained line); the published
   output targets ES2022 browsers.
-- React 19 for `/react` and `/ui`; `lucide-react` `>=0.400.0 <2` for `/ui`.
+- React 19 for `/react`, `/surfaces` and `/ui`; `lucide-react` `>=0.400.0 <2`
+  for `/ui`.
 - Tailwind CSS in the app that renders `/ui`: the components are styled with
   utility classes and ship no stylesheet of their own.
 
@@ -161,6 +165,61 @@ state. The `/ui` components are presentational and take their handlers as
 props; they own no routing and no persistence, so they drop into an existing
 shell.
 
+## Dialogs, drawers and sheets
+
+`game-session/surfaces` is for a game with its own look. It draws nothing of its
+own: the host passes the content, the class names and a name for assistive
+technology, and the primitives supply what is hard to get right.
+
+```tsx
+import { createSurfaceStack, Dialog, Sheet, SurfaceClose, SurfaceStackProvider } from "game-session/surfaces";
+// Only for the Android back button; `npm install capacitor-device-profile
+// @capacitor/app @capacitor/core`. The stack itself needs none of them.
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+import { createAppLifecycle } from "capacitor-device-profile";
+
+// One stack for the page. `back` is anything with pushBackHandler(handler),
+// such as the AppLifecycle that capacitor-device-profile returns; give it the
+// Capacitor App plugin so native back presses reach it.
+const lifecycle = createAppLifecycle({ app: App, native: Capacitor.isNativePlatform() });
+const surfaces = createSurfaceStack({ back: lifecycle });
+
+// A surface opening or closing is the host's cue to pause or resume.
+surfaces.onPausingChange((pausing) => setPauseReason("surface", pausing));
+
+function Confirm({ open, onAnswer }: { open: boolean; onAnswer: (yes: boolean) => void }) {
+  return (
+    <Dialog aria-label="Confirm" open={open} role="alertdialog" className="panel">
+      <button data-autofocus type="button" onClick={() => onAnswer(true)}>Yes</button>
+      <button type="button" onClick={() => onAnswer(false)}>No</button>
+    </Dialog>
+  );
+}
+
+function Details({ open, close }: { open: boolean; close: () => void }) {
+  return (
+    <Sheet aria-label="Details" open={open} side="bottom" onDismiss={close}>
+      <SurfaceClose aria-label="Close" />
+    </Sheet>
+  );
+}
+
+root.render(
+  <SurfaceStackProvider stack={surfaces}>
+    <App />
+  </SurfaceStackProvider>,
+);
+```
+
+While a surface is open, focus is trapped in the top one and returns to the
+control that opened it when it closes. Escape and the back button close the top
+surface only, and a surface with no `onDismiss` (the confirmation above) takes
+both without closing. `pausing` is true while any surface that has not opted out
+with `pauses={false}` is open, however many are nested. See the
+[API reference](./docs/API.md#game-sessionsurfaces) for the CSS custom properties
+that set layering, safe-area insets and the 48 px minimum target.
+
 ## API overview
 
 | Export | Entry point | What it does |
@@ -180,6 +239,9 @@ shell.
 | `readGameProgress`, `writeGameProgress` | `./react` | Progress persistence |
 | `readGameSaveSlot`, `writeGameSaveSlot`, `clearGameSaveSlot` | `./react` | Save-slot persistence |
 | `applySettingsToDocument` | `./react` | Push settings onto the document |
+| `Dialog`, `Drawer`, `Sheet`, `Surface`, `SurfaceClose` | `./surfaces` (and `./ui`) | Unstyled accessible layers |
+| `createSurfaceStack`, `SurfaceStackProvider`, `useSurfaceStack`, `useSurfaceSnapshot` | `./surfaces` (and `./ui`) | The stack behind them: focus, Escape, back, pause signal |
+| `bindSurfacePauseFlag` | `./surfaces` (and `./ui`) | Mirror the pause signal onto the pause flag |
 | `GamePauseMenu`, `GameSettingsPanel`, `GameMenuButton` | `./ui` | Pause and settings UI |
 | `RuntimeResultRecorder` | `./ui` | Records a result on mount |
 | `GameErrorBoundary` | `./ui` | Error boundary with a return-to-menu fallback |

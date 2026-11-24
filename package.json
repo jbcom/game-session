@@ -33,6 +33,16 @@
         "default": "./dist/cjs/react.cjs"
       }
     },
+    "./surfaces": {
+      "import": {
+        "types": "./dist/esm/surfaces.d.ts",
+        "default": "./dist/esm/surfaces.js"
+      },
+      "require": {
+        "types": "./dist/cjs/surfaces.d.cts",
+        "default": "./dist/cjs/surfaces.cjs"
+      }
+    },
     "./ui": {
       "import": {
         "types": "./dist/esm/ui.d.ts",
@@ -49,6 +59,9 @@
     "*": {
       "react": [
         "./dist/esm/react.d.ts"
+      ],
+      "surfaces": [
+        "./dist/esm/surfaces.d.ts"
       ],
       "ui": [
         "./dist/esm/ui.d.ts"
@@ -68,15 +81,16 @@
     "build": "node scripts/build.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "coverage": "vitest run --coverage",
+    "test": "vitest run --project unit",
+    "test:browser": "vitest run --project browser",
+    "test:watch": "vitest --project unit",
+    "coverage": "vitest run --project unit --coverage",
     "examples:check": "node examples/basic.mjs && node examples/commonjs.cjs",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "lint:docs": "markdownlint-cli2 README.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md CHANGELOG.md AGENTS.md \"docs/**/*.md\" \"!docs/node_modules/**\" \"!docs/dist/**\" .github/PULL_REQUEST_TEMPLATE.md",
     "package:check": "publint && attw --pack . && node scripts/verify-package.mjs",
-    "verify": "pnpm run lint && pnpm run lint:docs && pnpm run typecheck && pnpm run coverage && pnpm run build && pnpm run examples:check && pnpm run package:check",
+    "verify": "pnpm run lint && pnpm run lint:docs && pnpm run typecheck && pnpm run coverage && pnpm run test:browser && pnpm run build && pnpm run examples:check && pnpm run package:check",
     "prepack": "node scripts/build.mjs",
     "docs:dev": "pnpm --filter game-session-docs dev",
     "docs:build": "pnpm --filter game-session-docs build",
@@ -107,11 +121,13 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitest/browser-playwright": "^5.0.5",
     "@vitest/coverage-v8": "^5.0.3",
     "jsdom": "^30.1.2",
     "lint-staged": "^17.6.0",
     "lucide-react": "^1.52.0",
     "markdownlint-cli2": "^0.23.3",
+    "playwright": "^1.65.1",
     "publint": "^0.3.25",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
